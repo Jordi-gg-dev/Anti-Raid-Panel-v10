@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Reportes abiertos</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ open_reports }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Sanciones (24h)</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ incidents_24h }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Sanciones (total)</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ total_incidents }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Backups</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ backups_count }}</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="card">
+    <div class="font-bold text-white mb-4">🛡️ Estado de protección</div>
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-slate-300">Anti-Nuke</span>
+        <span class="pill {{ 'pill-on' if antinuke_on else 'pill-off' }}">{{ 'Activo' if antinuke_on else 'Inactivo' }}</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-slate-300">Anti-Spam</span>
+        <span class="pill {{ 'pill-on' if antispam_on else 'pill-off' }}">{{ 'Activo' if antispam_on else 'Inactivo' }}</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-slate-300">Anti-Raid</span>
+        <span class="pill {{ 'pill-on' if antiraid_on else 'pill-off' }}">{{ 'Activo' if antiraid_on else 'Inactivo' }}</span>
+      </div>
+    </div>
+    <a href="{{ url_for('guild_detail', guild_id=guild_id, tab='config') }}" class="btn-ghost inline-block mt-4">Ajustar configuración →</a>
+  </div>
+
+  <div class="card">
+    <div class="font-bold text-white mb-4">🌐 Información del servidor</div>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-slate-500">Nombre</span><span class="text-slate-200">{{ guild['name'] }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">ID</span><code class="text-slate-200 text-xs">{{ guild['id'] }}</code></div>
+      {% if guild.get('approximate_member_count') %}
+      <div class="flex justify-between"><span class="text-slate-500">Miembros</span><span class="text-slate-200">{{ guild['approximate_member_count'] }}</span></div>
+      {% endif %}
+      <div class="flex justify-between"><span class="text-slate-500">Canales de texto</span><span class="text-slate-200">{{ text_channels|length }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Roles</span><span class="text-slate-200">{{ roles|length }}</span></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

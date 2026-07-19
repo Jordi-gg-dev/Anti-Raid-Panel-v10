@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card relative overflow-hidden mb-6 !p-0">
+  <div class="absolute inset-0 bg-gradient-to-br from-orange-600/10 via-transparent to-amber-400/5 pointer-events-none"></div>
+  <div class="relative flex flex-col sm:flex-row sm:items-center gap-5 p-6">
+    <div class="w-16 h-16 shrink-0 drop-shadow-[0_0_18px_rgba(90,168,240,0.3)]">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="AstroCube" class="w-full h-full">
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="text-[11px] tracking-[0.2em] uppercase text-slate-500 font-bold mb-1">Panel de AstroCube</div>
+      <h1 class="text-2xl font-extrabold text-white">Servidores</h1>
+      {% if is_filtered_view %}
+      <p class="text-sm text-slate-400 mt-1">Servidores donde eres administrador y AstroCube Anti-Raid está instalado. Elige uno para gestionarlo.</p>
+      {% else %}
+      <p class="text-sm text-slate-400 mt-1">Servidores donde AstroCube Anti-Raid está instalado. Elige uno para gestionarlo.</p>
+      {% endif %}
+    </div>
+    {% if bot_user %}
+    <div class="flex items-center gap-2 bg-black/30 border border-white/5 rounded-xl px-3 py-2 shrink-0">
+      {% if bot_user.get('avatar') %}
+        <img src="https://cdn.discordapp.com/avatars/{{ bot_user['id'] }}/{{ bot_user['avatar'] }}.png" class="w-8 h-8 rounded-full">
+      {% endif %}
+      <div class="text-xs">
+        <div class="text-white font-bold leading-none">{{ bot_user.get('username', 'AstroCube') }}</div>
+        <div class="text-emerald-400 font-semibold mt-1">🟢 En línea</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card">
+    <div class="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">Servidores</div>
+    <div class="text-2xl font-extrabold text-white">{{ guilds|length }}</div>
+  </div>
+  <div class="card">
+    <div class="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">Reportes abiertos</div>
+    <div class="text-2xl font-extrabold text-orange-400">{{ total_open_reports }}</div>
+  </div>
+  <div class="card">
+    <div class="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">Incidentes 24h</div>
+    <div class="text-2xl font-extrabold text-white">{{ total_incidents_24h }}</div>
+  </div>
+  <div class="card">
+    <div class="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">Tareas pendientes</div>
+    <div class="text-2xl font-extrabold text-white">{{ total_pending_tasks }}</div>
+  </div>
+</div>
+
+{% if not guilds %}
+  <div class="card text-center text-slate-400">
+    {% if is_filtered_view %}
+      No administras ningún servidor donde esté AstroCube Anti-Raid. Pide a quien lo administre que te dé el rol de Administrador o "Gestionar Servidor".
+    {% else %}
+      No se ha podido cargar ningún servidor. Comprueba que <code>DISCORD_TOKEN</code> en el <code>.env</code> del panel sea correcto.
+    {% endif %}
+  </div>
+{% else %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for g in guilds %}
+  {% set stats = guild_stats.get(g['id'], {}) %}
+  <a href="{{ url_for('guild_detail', guild_id=g['id']) }}" class="card hover:border-orange-600/40 hover:-translate-y-0.5 transition block">
+    <div class="flex items-center gap-3 mb-4">
+      {% if g.get('icon') %}
+        <img src="https://cdn.discordapp.com/icons/{{ g['id'] }}/{{ g['icon'] }}.png" class="w-11 h-11 rounded-xl">
+      {% else %}
+        <div class="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 font-bold">{{ g['name'][:1] }}</div>
+      {% endif %}
+      <div class="min-w-0 flex-1">
+        <div class="font-bold text-white truncate">{{ g['name'] }}</div>
+        <div class="text-xs text-slate-500">ID: {{ g['id'] }}</div>
+      </div>
+      <span class="pill pill-on shrink-0">🟢 Activo</span>
+    </div>
+
+    <div class="flex items-center gap-4 text-xs mb-3">
+      <div>
+        <span class="text-slate-500">Reportes:</span>
+        <span class="font-bold {% if stats.open_reports %}text-orange-400{% else %}text-slate-300{% endif %}">{{ stats.open_reports or 0 }}</span>
+      </div>
+      <div>
+        <span class="text-slate-500">Incidentes 24h:</span>
+        <span class="font-bold text-slate-300">{{ stats.incidents_24h or 0 }}</span>
+      </div>
+      <div>
+        <span class="text-slate-500">Tareas:</span>
+        <span class="font-bold text-slate-300">{{ stats.pending_tasks or 0 }}</span>
+      </div>
+    </div>
+
+    <div class="text-xs text-orange-300 font-semibold">Gestionar servidor →</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

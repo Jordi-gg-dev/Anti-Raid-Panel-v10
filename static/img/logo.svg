@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" fill="none">
+  <defs>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="topFace" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eafcff"/>
+      <stop offset="1" stop-color="#bfe9ff"/>
+    </linearGradient>
+    <linearGradient id="leftFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fd3ff"/>
+      <stop offset="1" stop-color="#4aa8f7"/>
+    </linearGradient>
+    <linearGradient id="rightFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5aa8f0"/>
+      <stop offset="1" stop-color="#2f6fd6"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#glow)">
+    <polygon points="50,6 88,28 50,50 12,28" fill="url(#topFace)"/>
+    <polygon points="12,28 50,50 50,92 12,70" fill="url(#leftFace)"/>
+    <polygon points="88,28 50,50 50,92 88,70" fill="url(#rightFace)"/>
+    <polygon points="50,6 88,28 50,50 12,28" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="0.6"/>
+    <polygon points="12,28 50,50 50,92 12,70" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="0.6"/>
+    <polygon points="88,28 50,50 50,92 88,70" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="0.6"/>
+  </g>
+
+  <circle cx="30" cy="20" r="0.9" fill="#ffffff" opacity="0.9"/>
+  <circle cx="70" cy="16" r="0.6" fill="#ffffff" opacity="0.7"/>
+  <circle cx="20" cy="60" r="0.7" fill="#ffffff" opacity="0.8"/>
+  <circle cx="78" cy="55" r="0.5" fill="#ffffff" opacity="0.6"/>
+  <circle cx="50" cy="98" r="0.6" fill="#ffffff" opacity="0.6"/>
+</svg>

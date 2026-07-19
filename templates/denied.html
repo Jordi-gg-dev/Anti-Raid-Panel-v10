@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Acceso denegado</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="min-h-screen text-slate-200 flex items-center justify-center">
+  <div class="card max-w-sm text-center">
+    <div class="text-4xl mb-3">🚫</div>
+    <div class="text-lg font-bold text-white mb-2">Acceso denegado</div>
+    {% if reason == 'owner' %}
+    <p class="text-sm text-slate-400 mb-5">
+      {{ user }}, esta sección es exclusiva del propietario del bot (configurado en <code>OWNER_IDS</code>). Si administras un servidor concreto, gestiónalo desde "Servidores".
+    </p>
+    <a href="{{ url_for('dashboard') }}" class="btn-ghost">Ir a Servidores</a>
+    {% else %}
+    <p class="text-sm text-slate-400 mb-5">
+      {{ user }} no tiene permiso de administrador en ese servidor, así que no puede gestionarlo desde aquí.
+    </p>
+    <a href="/logout" class="btn-ghost">Cerrar sesión</a>
+    {% endif %}
+  </div>
+</body>
+</html>

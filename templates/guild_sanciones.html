@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="grid grid-cols-2 gap-4 mb-5">
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Total</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ total }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Últimas 24h</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ last24h }}</div>
+  </div>
+</div>
+
+<div class="flex items-center justify-between mb-4">
+  <div class="text-sm text-slate-400">Sanciones automáticas aplicadas por el bot en este servidor.</div>
+  <form method="post" action="{{ url_for('guild_incidents_clear', guild_id=guild_id) }}" onsubmit="return confirm('¿Borrar todo el historial?');">
+    <button type="submit" class="btn-danger">🗑️ Borrar historial</button>
+  </form>
+</div>
+
+{% if not incidents %}
+  <div class="card text-center text-slate-400">Sin sanciones registradas. Buena señal 👍</div>
+{% else %}
+<div class="card !p-0 overflow-hidden overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-slate-500 text-xs uppercase border-b border-white/5">
+        <th class="px-4 py-3">Módulo</th>
+        <th class="px-4 py-3">Usuario</th>
+        <th class="px-4 py-3">Detalle</th>
+        <th class="px-4 py-3">Acción</th>
+        <th class="px-4 py-3">Cuándo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for module, executor_id, detail, action, ts in incidents %}
+      <tr class="border-b border-white/5 last:border-0">
+        <td class="px-4 py-3"><span class="pill pill-off">{{ module }}</span></td>
+        <td class="px-4 py-3 text-slate-300">{% if executor_id %}<code class="text-xs">{{ executor_id }}</code>{% else %}—{% endif %}</td>
+        <td class="px-4 py-3 text-slate-300">{{ detail }}</td>
+        <td class="px-4 py-3 text-slate-300">{{ action }}</td>
+        <td class="px-4 py-3 text-slate-500 text-xs epoch" data-ts="{{ ts|int }}">{{ ts|int }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+  document.querySelectorAll(".epoch").forEach(el => {
+    const d = new Date(parseInt(el.dataset.ts, 10) * 1000);
+    el.textContent = d.toLocaleString();
+  });
+</script>
+{% endif %}
+{% endblock %}

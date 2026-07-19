@@ -1,0 +1,98 @@
+{% import "_icons.html" as icons %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title or bot_name }} · Panel</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% if custom_css %}<style>{{ custom_css|safe }}</style>{% endif %}
+</head>
+<body class="min-h-screen text-slate-200">
+
+  <header class="sticky top-0 z-40 bg-black/95 border-b-2 border-orange-500">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-6">
+      <a href="{{ url_for('dashboard') }}" class="flex items-center gap-2 shrink-0">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" class="w-8 h-8">
+        <span class="text-xl font-extrabold tracking-tight"><span class="text-white">ASTRO</span><span class="text-orange-400">CUBE</span></span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-300">
+        <a href="{{ url_for('dashboard') }}" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('home') }} Inicio</a>
+        <a href="#" title="Próximamente" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('shopping-bag') }} Tienda</a>
+        <a href="{{ url_for('dashboard') }}" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('users') }} Staff</a>
+        <a href="#" title="Próximamente" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('file-text') }} Normas</a>
+      </nav>
+      <a href="{{ url_for('logout') }}" class="btn-primary shrink-0 flex items-center gap-1.5">{{ icons.icon('log-out') }} Cerrar sesión</a>
+    </div>
+  </header>
+
+  <div class="flex max-w-7xl mx-auto">
+    <aside class="w-72 shrink-0 p-5 space-y-4 self-start">
+
+      <div class="card !p-4">
+        <div class="flex items-center gap-3 mb-4">
+          {% if session_avatar %}
+            <img src="{{ session_avatar }}" class="w-14 h-14 rounded-full ring-2 ring-orange-500/30">
+          {% else %}
+            <div class="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center text-slate-500 font-bold">{{ (session_user or "A")[:1] }}</div>
+          {% endif %}
+          <div class="min-w-0">
+            <div class="font-bold text-white leading-tight truncate">{{ session_user }}</div>
+            <div class="text-[11px] text-orange-400 font-bold uppercase tracking-wide mt-0.5">Propietario</div>
+          </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-danger w-full flex justify-center items-center gap-1.5">{{ icons.icon('log-out') }} Cerrar sesión</a>
+      </div>
+
+      <div class="card !p-2">
+        {% if guild is defined and guild %}
+          <a href="{{ url_for('dashboard') }}" class="block text-[11px] text-slate-500 hover:text-slate-300 font-semibold px-3 pt-2 pb-2">← Todos los servidores</a>
+          <div class="flex items-center gap-2 px-3 pb-3 mb-1 border-b border-white/5">
+            {% if guild.get('icon') %}
+              <img src="https://cdn.discordapp.com/icons/{{ guild['id'] }}/{{ guild['icon'] }}.png" class="w-7 h-7 rounded-lg">
+            {% else %}
+              <div class="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-[11px] text-slate-500 font-bold">{{ guild['name'][:1] }}</div>
+            {% endif %}
+            <div class="text-xs font-bold text-white truncate">{{ guild['name'] }}</div>
+          </div>
+          {% for key, label, ic in tabs %}
+          <a href="{{ url_for('guild_detail', guild_id=guild_id, tab=key) }}"
+             class="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if tab == key %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">
+            <span class="flex items-center gap-2.5">{{ icons.icon(ic) }} {{ label }}</span>
+            {% if key == 'reportes' and counts and counts.open_reports %}
+              <span class="text-[10px] font-bold {% if tab == key %}bg-black/25 text-black{% else %}bg-orange-500/20 text-orange-300{% endif %} rounded-full px-1.5 py-0.5">{{ counts.open_reports }}</span>
+            {% elif key == 'tareas' and counts and counts.pending_tasks %}
+              <span class="text-[10px] font-bold {% if tab == key %}bg-black/25 text-black{% else %}bg-orange-500/20 text-orange-300{% endif %} rounded-full px-1.5 py-0.5">{{ counts.pending_tasks }}</span>
+            {% endif %}
+          </a>
+          {% endfor %}
+        {% else %}
+          <a href="{{ url_for('dashboard') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'dashboard' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('grid') }} Servidores</a>
+          {% if is_owner %}
+          <a href="{{ url_for('activity_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'activity_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('activity') }} Actividad</a>
+          <a href="{{ url_for('global_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'global_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('globe') }} Global</a>
+          <a href="{{ url_for('code_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold {% if request.endpoint == 'code_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('code') }} Código</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </aside>
+
+    <main class="flex-1 p-6 min-w-0">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="mb-5 px-4 py-3 rounded-xl text-sm font-medium {% if category == 'success' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-red-500/10 text-red-400 border border-red-500/20{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+{% if custom_js %}<script>{{ custom_js|safe }}</script>{% endif %}
+</body>
+</html>

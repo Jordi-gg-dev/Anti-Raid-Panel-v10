@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="card">
+    <div class="font-bold text-white mb-4">✉️ Enviar mensaje (embed)</div>
+    <form method="post" action="{{ url_for('guild_send_embed', guild_id=guild_id) }}" class="space-y-4">
+      <div>
+        <label class="field-label">Canal</label>
+        <select name="channel_id" required>
+          {% for c in text_channels %}
+            <option value="{{ c['id'] }}">#{{ c['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Título</label>
+        <input type="text" name="title" placeholder="📢 Anuncio de AstroCube">
+      </div>
+      <div>
+        <label class="field-label">Descripción</label>
+        <textarea name="description" rows="6" placeholder="Escribe el contenido del mensaje. Usa \n para saltos de línea."></textarea>
+      </div>
+      <div>
+        <label class="field-label">Color (hex)</label>
+        <input type="text" name="color" value="8B5CF6" placeholder="8B5CF6">
+      </div>
+      <button type="submit" class="btn-primary">🚀 Enviar</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="font-bold text-white mb-3">Vista previa</div>
+    <p class="text-xs text-slate-500 mb-4">El mensaje se envía tal cual a Discord como un embed con la marca visual estándar (título, descripción y color elegido).</p>
+    <div class="rounded-lg border-l-4 border-orange-600 bg-black/30 p-4">
+      <div class="text-sm font-bold text-white">Así se verá aproximadamente</div>
+      <div class="text-xs text-slate-400 mt-1">El color de la barra izquierda cambia según el hex que pongas.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

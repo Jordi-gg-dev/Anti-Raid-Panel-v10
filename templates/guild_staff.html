@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="grid grid-cols-1 {% if is_owner %}lg:grid-cols-2{% endif %} gap-6 mb-6">
+  {% if is_owner %}
+  <div class="card">
+    <div class="font-bold text-white mb-1">👑 Propietarios del bot</div>
+    <p class="text-xs text-slate-400 mb-4">Estos IDs son superadministradores: pueden ver y gestionar TODOS los servidores del bot, no solo este (configurado en <code>OWNER_IDS</code> del <code>.env</code>).</p>
+    <div class="space-y-2">
+      {% for oid in owner_ids %}
+      <div class="bg-black/20 rounded-lg px-3 py-2">
+        <code class="text-xs text-slate-300">{{ oid }}</code>
+      </div>
+      {% else %}
+      <div class="text-xs text-slate-500">Sin propietarios configurados.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="font-bold text-white mb-1">🎭 Roles con permisos de administrador</div>
+    <p class="text-xs text-slate-400 mb-4">Detectados automáticamente en este servidor (permiso "Administrador" o "Gestionar Servidor").</p>
+    <div class="space-y-2">
+      {% for r in admin_roles %}
+      <div class="bg-black/20 rounded-lg px-3 py-2 flex items-center justify-between">
+        <span class="text-sm text-slate-200">{{ r['name'] }}</span>
+        <code class="text-[10px] text-slate-500">{{ r['id'] }}</code>
+      </div>
+      {% else %}
+      <div class="text-xs text-slate-500">No se detectaron roles de administrador.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<p class="text-sm text-slate-400 mb-4">Usuarios y bots de confianza excluidos de los castigos automáticos. Pega el ID de Discord (clic derecho sobre el usuario con el Modo Desarrollador activo → Copiar ID).</p>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+  {% for key, title, desc in [
+    ('antinuke', '🛡️ Anti-Nuke — usuarios', 'Nunca serán castigados por borrar/crear canales o roles en masa.'),
+    ('antinuke_bots', '🤖 Anti-Nuke — bots', 'Bots de confianza que gestionan canales/roles (tickets, backups, etc.).'),
+    ('antispam', '💬 Anti-Spam', 'Excluidos del flood de mensajes y spam de menciones.'),
+    ('antiraid', '🚨 Anti-Raid', 'Excluidos del filtro de cuentas nuevas.'),
+  ] %}
+  <div class="card">
+    <div class="font-bold text-white">{{ title }}</div>
+    <div class="text-xs text-slate-400 mb-4">{{ desc }}</div>
+
+    <form method="post" action="{{ url_for('guild_whitelist_add', guild_id=guild_id, list_name=key) }}" class="flex gap-2 mb-4">
+      <input type="text" name="entity_id" placeholder="ID de Discord" required>
+      <button type="submit" class="btn-ghost shrink-0">Añadir</button>
+    </form>
+
+    <div class="space-y-2">
+      {% for entity_id in whitelist[key] %}
+      <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+        <code class="text-xs text-slate-300">{{ entity_id }}</code>
+        <form method="post" action="{{ url_for('guild_whitelist_remove', guild_id=guild_id, list_name=key, entity_id=entity_id) }}">
+          <button type="submit" class="text-xs text-red-400 hover:text-red-300 font-semibold">Quitar</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="text-xs text-slate-500">Vacío.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="text-xs text-slate-500 font-semibold mb-1">Panel de AstroCube</div>
+  <h1 class="text-2xl font-extrabold text-white">🌐 Global</h1>
+  <p class="text-sm text-slate-400 mt-1">Bloqueos a nivel de todo el bot (afectan a cualquier servidor).</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="card">
+    <div class="font-bold text-white mb-1">🚫 Servidores bloqueados</div>
+    <p class="text-xs text-slate-400 mb-4">El bot abandona el servidor bloqueado y no puede volver a entrar.</p>
+    <form method="post" action="{{ url_for('global_guild_blacklist_add') }}" class="space-y-2 mb-4">
+      <input type="text" name="guild_id" placeholder="ID del servidor" required>
+      <input type="text" name="reason" placeholder="Motivo (opcional)">
+      <button type="submit" class="btn-danger w-full">Bloquear servidor</button>
+    </form>
+    <div class="space-y-2">
+      {% for guild_id, reason, ts in guild_blacklist %}
+      <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+        <div>
+          <code class="text-xs text-slate-300">{{ guild_id }}</code>
+          <div class="text-xs text-slate-500">{{ reason }}</div>
+        </div>
+        <form method="post" action="{{ url_for('global_guild_blacklist_remove', guild_id=guild_id) }}">
+          <button type="submit" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold">Desbloquear</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="text-xs text-slate-500">Ningún servidor bloqueado.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="font-bold text-white mb-1">🙅 Usuarios bloqueados</div>
+    <p class="text-xs text-slate-400 mb-4">Impide que ese usuario use el bot en cualquier servidor.</p>
+    <form method="post" action="{{ url_for('global_user_blacklist_add') }}" class="space-y-2 mb-4">
+      <input type="text" name="user_id" placeholder="ID de usuario" required>
+      <input type="text" name="reason" placeholder="Motivo (opcional)">
+      <button type="submit" class="btn-danger w-full">Bloquear usuario</button>
+    </form>
+    <div class="space-y-2">
+      {% for user_id, reason, ts in user_blacklist %}
+      <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+        <div>
+          <code class="text-xs text-slate-300">{{ user_id }}</code>
+          <div class="text-xs text-slate-500">{{ reason }}</div>
+        </div>
+        <form method="post" action="{{ url_for('global_user_blacklist_remove', user_id=user_id) }}">
+          <button type="submit" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold">Desbloquear</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="text-xs text-slate-500">Ningún usuario bloqueado.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

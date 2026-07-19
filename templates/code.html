@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="text-xs text-slate-500 font-semibold mb-1">Panel de AstroCube</div>
+  <h1 class="text-2xl font-extrabold text-white">Código personalizado</h1>
+  <p class="text-sm text-slate-400 mt-1">Añade tu propio CSS o JavaScript para retocar el aspecto del panel. Se aplica a todas las páginas al instante.</p>
+</div>
+
+<div class="card mb-4 !border-amber-500/20 !bg-amber-500/5">
+  <p class="text-xs text-amber-300">⚠️ Este código se ejecuta tal cual en el navegador con tu sesión activa. Solo tú tienes acceso a esta página, pero evita pegar código que no entiendas.</p>
+</div>
+
+<form method="post" class="space-y-5">
+  <div class="card">
+    <label class="field-label">CSS personalizado</label>
+    <textarea name="custom_css" rows="10" spellcheck="false" class="font-mono text-xs" placeholder=".card { border-radius: 20px; }">{{ custom_css }}</textarea>
+  </div>
+  <div class="card">
+    <label class="field-label">JavaScript personalizado</label>
+    <textarea name="custom_js" rows="10" spellcheck="false" class="font-mono text-xs" placeholder="console.log('AstroCube panel cargado');">{{ custom_js }}</textarea>
+  </div>
+  <button type="submit" class="btn-primary">Guardar código</button>
+</form>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="card max-w-lg">
+  {% if bot_user %}
+  <div class="flex items-center gap-4 mb-5">
+    {% if bot_user.get('avatar') %}
+      <img src="https://cdn.discordapp.com/avatars/{{ bot_user['id'] }}/{{ bot_user['avatar'] }}.png" class="w-16 h-16 rounded-2xl">
+    {% else %}
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-600 to-amber-400 flex items-center justify-center text-2xl">🛰️</div>
+    {% endif %}
+    <div>
+      <div class="text-lg font-extrabold text-white">{{ bot_user['username'] }}</div>
+      <div class="text-xs text-slate-500">ID: {{ bot_user['id'] }}</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-sm text-slate-400 mb-5">No se pudo cargar la información del bot.</div>
+  {% endif %}
+
+  <div class="space-y-2 text-sm mb-5">
+    <div class="flex justify-between"><span class="text-slate-500">En este servidor</span><span class="text-slate-200">{{ guild['name'] }}</span></div>
+    <div class="flex justify-between"><span class="text-slate-500">Estado</span><span class="pill pill-on">Conectado a la API</span></div>
+  </div>
+
+  <a href="https://discord.com/oauth2/authorize?client_id={{ bot_user['id'] if bot_user else '' }}&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn-primary w-full justify-center">
+    🔗 Invitar a otro servidor
+  </a>
+</div>
+{% endblock %}

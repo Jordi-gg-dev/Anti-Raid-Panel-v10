@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<form method="post" action="{{ url_for('guild_config_save', guild_id=guild_id) }}" class="space-y-6">
+
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div class="font-bold text-white">🛡️ Anti-Nuke</div>
+        <div class="text-xs text-slate-400">Borrado/creación masiva de canales o roles, baneos masivos</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" name="antinuke_enabled" {% if cfg.antinuke_enabled %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+      <div>
+        <label class="field-label">Canal de logs</label>
+        <select name="antinuke_log_channel">
+          <option value="">— Sin configurar —</option>
+          {% for c in text_channels %}
+            <option value="{{ c['id'] }}" {% if cfg.antinuke_log_channel and cfg.antinuke_log_channel|string == c['id']|string %}selected{% endif %}>#{{ c['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Castigo automático</label>
+        <select name="antinuke_punishment">
+          {% for value, label in [('strip-roles','Quitar todos los roles'), ('timeout','Silenciar 1 hora'), ('kick','Expulsar'), ('ban','Banear')] %}
+            <option value="{{ value }}" {% if cfg.antinuke_punishment == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Umbrales (cantidad de acciones en X segundos)</div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {% for key, label in [('channel_delete','Borrar canales'), ('channel_create','Crear canales'), ('role_delete','Borrar roles'), ('role_create','Crear roles'), ('ban','Baneos'), ('webhook_create','Webhooks')] %}
+      <div class="bg-black/20 rounded-xl p-3">
+        <div class="text-xs text-slate-400 mb-2">{{ label }}</div>
+        <div class="flex items-center gap-1">
+          <input type="number" min="1" name="threshold_{{ key }}_count" value="{{ thresholds[key][0] }}" class="!w-16">
+          <span class="text-slate-500 text-xs">en</span>
+          <input type="number" min="2" name="threshold_{{ key }}_seconds" value="{{ thresholds[key][1] }}" class="!w-16">
+          <span class="text-slate-500 text-xs">s</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div class="font-bold text-white">💬 Anti-Spam</div>
+        <div class="text-xs text-slate-400">Flood de mensajes y spam de menciones</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" name="antispam_enabled" {% if cfg.antispam_enabled %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="field-label">Mensajes seguidos</label>
+        <div class="flex items-center gap-1">
+          <input type="number" min="3" name="message_threshold_count" value="{{ message_threshold[0] }}">
+          <span class="text-slate-500 text-xs">en</span>
+          <input type="number" min="2" name="message_threshold_seconds" value="{{ message_threshold[1] }}">
+          <span class="text-slate-500 text-xs">s</span>
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Menciones por mensaje</label>
+        <input type="number" min="3" name="mention_threshold" value="{{ mention_threshold }}">
+      </div>
+      <div>
+        <label class="field-label">Castigo automático</label>
+        <select name="antispam_punishment">
+          {% for value, label in [('timeout','Silenciar 10 min'), ('kick','Expulsar'), ('ban','Banear')] %}
+            <option value="{{ value }}" {% if cfg.antispam_punishment == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div class="font-bold text-white">🚨 Anti-Raid</div>
+        <div class="text-xs text-slate-400">Oleadas de entrada y filtro de cuentas nuevas</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" name="antiraid_enabled" {% if cfg.antiraid_enabled %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="field-label">Canal de logs</label>
+        <select name="antiraid_log_channel">
+          <option value="">— Sin configurar —</option>
+          {% for c in text_channels %}
+            <option value="{{ c['id'] }}" {% if cfg.antiraid_log_channel and cfg.antiraid_log_channel|string == c['id']|string %}selected{% endif %}>#{{ c['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Acción ante oleada de entradas</label>
+        <select name="antiraid_action">
+          {% for value, label in [('lockdown-verification','Subir verificación al máximo'), ('full-lockdown','Bloqueo total del servidor')] %}
+            <option value="{{ value }}" {% if cfg.antiraid_action == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="field-label">Entradas seguidas</label>
+        <div class="flex items-center gap-1">
+          <input type="number" min="3" name="join_threshold_count" value="{{ join_threshold[0] }}">
+          <span class="text-slate-500 text-xs">en</span>
+          <input type="number" min="3" name="join_threshold_seconds" value="{{ join_threshold[1] }}">
+          <span class="text-slate-500 text-xs">s</span>
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Edad mínima de cuenta (días)</label>
+        <input type="number" min="0" name="antiraid_min_account_age" value="{{ cfg.antiraid_min_account_age }}">
+      </div>
+      <div>
+        <label class="field-label">Rol automático (autorole)</label>
+        <select name="autorole">
+          <option value="">— Ninguno —</option>
+          {% for r in roles %}
+            <option value="{{ r['id'] }}" {% if cfg.autorole and cfg.autorole|string == r['id']|string %}selected{% endif %}>{{ r['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn-primary">💾 Guardar configuración</button>
+</form>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Sanciones</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ total_incidents }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Sanciones 24h</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ incidents_24h }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Reportes</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ total_reports }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Reportes abiertos</div>
+    <div class="text-2xl font-extrabold text-amber-400 mt-1">{{ open_reports }}</div>
+  </div>
+  <div class="card !p-4">
+    <div class="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Backups</div>
+    <div class="text-2xl font-extrabold text-white mt-1">{{ backups_count }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="font-bold text-white mb-4">📊 Sanciones por módulo</div>
+  {% if not by_module %}
+    <div class="text-sm text-slate-500 text-center py-6">Sin datos todavía.</div>
+  {% else %}
+  <div class="space-y-3">
+    {% for module, count in by_module %}
+    <div>
+      <div class="flex justify-between text-xs mb-1">
+        <span class="text-slate-300 font-semibold">{{ module }}</span>
+        <span class="text-slate-500">{{ count }}</span>
+      </div>
+      <div class="h-2 rounded-full bg-white/5 overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-orange-600 to-amber-400" style="width: {{ (count / max_count * 100)|round(1) }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

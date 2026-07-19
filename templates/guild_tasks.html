@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-3">✅ Nueva tarea</div>
+  <form method="post" action="{{ url_for('guild_task_add', guild_id=guild_id) }}" class="flex gap-2">
+    <input type="text" name="text" placeholder="ej. Revisar solicitudes de verificación" required>
+    <button type="submit" class="btn-primary shrink-0">Añadir</button>
+  </form>
+</div>
+
+<div class="space-y-2">
+  {% for tid, text, done, created_at in tasks %}
+  <div class="card !py-3 flex items-center justify-between gap-3">
+    <form method="post" action="{{ url_for('guild_task_toggle', guild_id=guild_id, task_id=tid) }}" class="flex items-center gap-3 flex-1 min-w-0">
+      <button type="submit" class="w-5 h-5 rounded-md border-2 shrink-0 {{ 'bg-emerald-500 border-emerald-500' if done else 'border-white/20' }} flex items-center justify-center text-xs">
+        {% if done %}✓{% endif %}
+      </button>
+      <span class="text-sm {{ 'text-slate-500 line-through' if done else 'text-slate-200' }} truncate">{{ text }}</span>
+    </form>
+    <form method="post" action="{{ url_for('guild_task_delete', guild_id=guild_id, task_id=tid) }}">
+      <button type="submit" class="text-xs text-red-400 hover:text-red-300 font-semibold">Eliminar</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="card text-center text-slate-400">Sin tareas pendientes. 🎉</div>
+  {% endfor %}
+</div>
+{% endblock %}

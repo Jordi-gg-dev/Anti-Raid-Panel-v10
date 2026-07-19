@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="text-xs text-slate-500 font-semibold mb-1">Panel de AstroCube</div>
+  <h1 class="text-2xl font-extrabold text-white">Actividad</h1>
+  <p class="text-sm text-slate-400 mt-1">Servidores donde está el bot y qué administradores han entrado a gestionarlos, más el registro de inicios de sesión en el panel.</p>
+</div>
+
+<div class="font-bold text-white mb-3">Servidores y administradores conectados</div>
+<div class="space-y-3 mb-8">
+  {% for g in all_guilds %}
+  {% set entries = by_guild.get(g['id'], []) %}
+  <div class="card">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <div class="flex items-center gap-2.5">
+        {% if g.get('icon') %}
+          <img src="https://cdn.discordapp.com/icons/{{ g['id'] }}/{{ g['icon'] }}.png" class="w-8 h-8 rounded-lg">
+        {% else %}
+          <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 font-bold text-xs">{{ g['name'][:1] }}</div>
+        {% endif %}
+        <div>
+          <div class="font-bold text-white text-sm">{{ g['name'] }}</div>
+          <div class="text-[11px] text-slate-500">ID: {{ g['id'] }}</div>
+        </div>
+      </div>
+      <span class="pill pill-on">Conectado</span>
+    </div>
+
+    {% if entries %}
+    <div class="space-y-1.5">
+      {% for e in entries %}
+      <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2 text-xs epoch-row" data-last="{{ e.last_seen }}">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-slate-200 font-semibold truncate">{{ e.username or "Desconocido" }}</span>
+          <code class="text-slate-500">{{ e.user_id }}</code>
+        </div>
+        <div class="flex items-center gap-3 shrink-0 text-slate-500">
+          <span>{{ e.visits }} acceso{{ 's' if e.visits != 1 else '' }}</span>
+          <span class="last-seen-label">—</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-xs text-slate-500">Ningún administrador externo ha entrado todavía a este servidor.</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="card text-center text-slate-400">No se ha podido cargar ningún servidor.</div>
+  {% endfor %}
+</div>
+
+<div class="font-bold text-white mb-3">Últimos inicios de sesión en el panel</div>
+<div class="card !p-0 overflow-hidden">
+  {% if logins %}
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-[11px] text-slate-500 uppercase tracking-wide border-b border-white/5">
+        <th class="px-4 py-3 font-bold">Usuario</th>
+        <th class="px-4 py-3 font-bold">ID de Discord</th>
+        <th class="px-4 py-3 font-bold">Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user_id, username, avatar_url, created_at in logins %}
+      <tr class="border-b border-white/5 last:border-0">
+        <td class="px-4 py-2.5 flex items-center gap-2">
+          {% if avatar_url %}<img src="{{ avatar_url }}" class="w-6 h-6 rounded-full">{% endif %}
+          <span class="text-slate-200 font-semibold">{{ username or "—" }}</span>
+          {% if user_id in owner_ids_for_badge %}<span class="text-[9px] font-bold text-orange-400 uppercase">Propietario</span>{% endif %}
+        </td>
+        <td class="px-4 py-2.5"><code class="text-xs text-slate-400">{{ user_id }}</code></td>
+        <td class="px-4 py-2.5 text-slate-400 epoch-cell" data-ts="{{ created_at }}">—</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="text-center text-slate-400 py-8">Todavía no hay inicios de sesión registrados.</div>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll(".epoch-cell").forEach(el => {
+    const d = new Date(parseInt(el.dataset.ts, 10) * 1000);
+    el.textContent = d.toLocaleString();
+  });
+  document.querySelectorAll(".epoch-row").forEach(el => {
+    const d = new Date(parseInt(el.dataset.last, 10) * 1000);
+    el.querySelector(".last-seen-label").textContent = "Visto: " + d.toLocaleString();
+  });
+</script>
+{% endblock %}

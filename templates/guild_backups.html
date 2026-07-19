@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-1">📦 Crear copia de seguridad</div>
+  <p class="text-xs text-slate-400 mb-4">Guarda una foto de los canales y roles actuales del servidor para poder recrearlos si algo sale mal.</p>
+  <form method="post" action="{{ url_for('guild_backup_create', guild_id=guild_id) }}" class="flex gap-2">
+    <input type="text" name="label" placeholder="Etiqueta (ej. Backup semanal)" value="Backup desde el panel">
+    <button type="submit" class="btn-primary shrink-0">Crear ahora</button>
+  </form>
+</div>
+
+<div class="space-y-3">
+  {% for backup_id, label, ts in backups %}
+  <div class="card !py-4 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <div class="font-semibold text-white">#{{ backup_id }} — {{ label }}</div>
+      <div class="text-xs text-slate-500 epoch" data-ts="{{ ts|int }}">{{ ts|int }}</div>
+    </div>
+    <div class="flex gap-2">
+      <form method="post" action="{{ url_for('guild_backup_restore', guild_id=guild_id, backup_id=backup_id) }}" onsubmit="return confirm('Esto recreará los canales/roles que falten según este backup. ¿Continuar?');">
+        <button type="submit" class="btn-ghost">♻️ Restaurar</button>
+      </form>
+      <form method="post" action="{{ url_for('guild_backup_delete', guild_id=guild_id, backup_id=backup_id) }}" onsubmit="return confirm('¿Eliminar este backup?');">
+        <button type="submit" class="btn-danger">Eliminar</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="card text-center text-slate-400">Sin backups guardados todavía.</div>
+  {% endfor %}
+</div>
+
+<script>
+  document.querySelectorAll(".epoch").forEach(el => {
+    const d = new Date(parseInt(el.dataset.ts, 10) * 1000);
+    el.textContent = d.toLocaleString();
+  });
+</script>
+{% endblock %}
