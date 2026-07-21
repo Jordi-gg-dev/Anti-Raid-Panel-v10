@@ -822,7 +822,9 @@ def premium_checkout(guild_id):
     existing_customer_id = existing[1] if existing else None
 
     try:
-        checkout_url = stripe_client.create_checkout_session(guild_id, guild_name, existing_customer_id)
+        checkout_url = stripe_client.create_checkout_session(
+            guild_id, guild_name, existing_customer_id, buyer_user_id=session.get("user_id")
+        )
     except stripe_client.StripeNotConfigured as exc:
         flash(str(exc), "error")
         return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
@@ -851,6 +853,28 @@ def premium_portal(guild_id):
     return redirect(portal_url)
 
 
+def _premium_welcome_message(guild_name: str):
+    """Construye el MD de bienvenida que recibe quien acaba de comprar Premium.
+    Devuelve (title, description, fields, color_hex, footer)."""
+    title = "💎 ¡Gracias por activar AstroCube Premium!"
+    description = (
+        f"Tu servidor **{guild_name}** ya tiene Premium activo. "
+        "Aquí tienes un resumen de todo lo que has desbloqueado y cómo usarlo:"
+    )
+    fields = [
+        {"name": "🖥️ Comandos personalizados", "value": "Créalos desde el panel web, pestaña **Comandos**.", "inline": False},
+        {"name": "🎭 Perfil de bot", "value": "Cambia el apodo del bot para tu servidor en la pestaña **Perfil de Bot** del panel.", "inline": False},
+        {"name": "🎉 Sorteos ilimitados", "value": "`/sorteo crear` y `/sorteo terminar` — ya no hay límite de sorteos activos a la vez.", "inline": False},
+        {"name": "🎫 Transcripción de tickets", "value": "Configura el canal en la pestaña **Tickets** del panel. Se guardará la conversación completa al cerrar cada ticket.", "inline": False},
+        {"name": "🎯 Roles de reacción ilimitados", "value": "Crea todos los paneles que quieras desde la pestaña **Roles Reacción** del panel.", "inline": False},
+        {"name": "📈 Niveles avanzados", "value": "`/niveles multiplicador`, `/niveles color` y `/niveles rol-nivel` para personalizar tu sistema de niveles.", "inline": False},
+        {"name": "🗂️ Historial ilimitado", "value": "Las sanciones e incidentes ya no se borran a los 7 días.", "inline": False},
+        {"name": "💬 Asistencia 24/7", "value": f"Si tienes dudas o algo no funciona, únete a nuestro servidor de soporte y te ayudamos: {config.SUPPORT_SERVER_INVITE}", "inline": False},
+    ]
+    footer = "AstroCube Anti-Raid · Premium"
+    return title, description, fields, "F1C40F", footer
+
+
 @app.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
     """Endpoint publico que llama Stripe directamente (sin sesion de usuario).
@@ -867,11 +891,20 @@ def stripe_webhook():
     data_object = event["data"]["object"]
 
     if event_type == "checkout.session.completed":
-        guild_id = data_object.get("client_reference_id") or (data_object.get("metadata") or {}).get("guild_id")
+        metadata = data_object.get("metadata") or {}
+        guild_id = data_object.get("client_reference_id") or metadata.get("guild_id")
         customer_id = data_object.get("customer")
         subscription_id = data_object.get("subscription")
         if guild_id:
             db.upsert_premium(int(guild_id), "active", stripe_customer_id=customer_id, stripe_subscription_id=subscription_id)
+            buyer_user_id = metadata.get("buyer_user_id")
+            if buyer_user_id:
+                try:
+                    guild_name = metadata.get("guild_name") or str(guild_id)
+                    api.send_dm(config.BOT_TOKEN, int(buyer_user_id), *_premium_welcome_message(guild_name))
+                except api.DiscordAPIError:
+                    # El usuario puede tener los MD cerrados para el bot; no debe romper el webhook.
+                    pass
 
     elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
         subscription_id = data_object.get("id")

@@ -31,10 +31,16 @@ def _check_configured():
         )
 
 
-def create_checkout_session(guild_id: int, guild_name: str, existing_customer_id: str = None) -> str:
+def create_checkout_session(guild_id: int, guild_name: str, existing_customer_id: str = None, buyer_user_id: int | None = None) -> str:
     """Crea una sesion de Stripe Checkout para suscribir un servidor a Premium.
-    Devuelve la URL a la que hay que redirigir al usuario."""
+    Devuelve la URL a la que hay que redirigir al usuario.
+    buyer_user_id: ID de Discord de quien pulsa "Comprar", para poder mandarle
+    despues un MD de bienvenida a Premium cuando el pago se complete."""
     _check_configured()
+
+    metadata = {"guild_id": str(guild_id), "guild_name": guild_name}
+    if buyer_user_id:
+        metadata["buyer_user_id"] = str(buyer_user_id)
 
     params = {
         "mode": "subscription",
@@ -42,8 +48,8 @@ def create_checkout_session(guild_id: int, guild_name: str, existing_customer_id
         "success_url": f"{config.PUBLIC_BASE_URL}/guild/{guild_id}?tab=premium&checkout=success",
         "cancel_url": f"{config.PUBLIC_BASE_URL}/guild/{guild_id}?tab=premium&checkout=cancel",
         "client_reference_id": str(guild_id),
-        "metadata": {"guild_id": str(guild_id), "guild_name": guild_name},
-        "subscription_data": {"metadata": {"guild_id": str(guild_id), "guild_name": guild_name}},
+        "metadata": metadata,
+        "subscription_data": {"metadata": metadata},
     }
     if existing_customer_id:
         params["customer"] = existing_customer_id

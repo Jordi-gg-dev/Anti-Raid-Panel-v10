@@ -108,6 +108,41 @@ def send_embed(token: str, channel_id: int, title: str, description: str, color_
     return resp.json()
 
 
+def create_dm_channel(token: str, user_id: int) -> dict:
+    """Abre (o recupera, si ya existe) el canal de mensajes directos con un usuario."""
+    resp = _request("POST", f"{API_BASE}/users/@me/channels", headers=_headers(token), json={"recipient_id": user_id})
+    if resp.status_code not in (200, 201):
+        raise DiscordAPIError(f"No se pudo abrir el canal de MD ({resp.status_code}: {resp.text[:200]})")
+    return resp.json()
+
+
+def send_embed_rich(token: str, channel_id: int, title: str, description: str, fields: list | None = None,
+                     color_hex: str = "5865F2", footer: str | None = None) -> dict:
+    """Como send_embed, pero admite 'fields' (lista de {"name","value","inline"}) y pie de página."""
+    try:
+        color_int = int(color_hex.lstrip("#"), 16)
+    except ValueError:
+        color_int = 0x5865F2
+    embed = {"title": title, "description": description, "color": color_int}
+    if fields:
+        embed["fields"] = fields
+    if footer:
+        embed["footer"] = {"text": footer}
+    payload = {"embeds": [embed]}
+    resp = _request("POST", f"{API_BASE}/channels/{channel_id}/messages", headers=_headers(token), json=payload)
+    if resp.status_code not in (200, 201):
+        raise DiscordAPIError(f"No se pudo enviar el mensaje ({resp.status_code}: {resp.text[:200]})")
+    return resp.json()
+
+
+def send_dm(token: str, user_id: int, title: str, description: str, fields: list | None = None,
+            color_hex: str = "5865F2", footer: str | None = None) -> dict:
+    """Abre un MD con el usuario y le envia un embed. Lanza DiscordAPIError si
+    el usuario tiene los MDs cerrados para el bot o cualquier otro fallo."""
+    dm_channel = create_dm_channel(token, user_id)
+    return send_embed_rich(token, dm_channel["id"], title, description, fields=fields, color_hex=color_hex, footer=footer)
+
+
 def create_channel(token: str, guild_id: int, name: str, channel_type: int = 0, parent_id: int | None = None) -> dict:
     payload = {"name": name, "type": channel_type}
     if parent_id:
