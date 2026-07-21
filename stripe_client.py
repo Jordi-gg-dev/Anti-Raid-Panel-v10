@@ -47,8 +47,9 @@ def create_checkout_session(guild_id: int, guild_name: str, existing_customer_id
     }
     if existing_customer_id:
         params["customer"] = existing_customer_id
-    else:
-        params["customer_creation"] = "always"
+    # En mode="subscription" Stripe crea el cliente automaticamente si no se
+    # pasa "customer" -> NO usar "customer_creation" aqui, ese parametro solo
+    # es valido en mode="payment" (usarlo en subscription da un error 400).
 
     session = stripe.checkout.Session.create(**params)
     return session.url
