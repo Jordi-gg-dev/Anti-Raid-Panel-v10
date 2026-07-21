@@ -2,8 +2,19 @@
 {% block content %}
 {% include "_page_header.html" %}
 
+{% set limite_alcanzado = (not is_premium) and (panels_with_options|length >= FREE_REACTION_PANEL_LIMIT) %}
 <div class="card mb-6">
-  <div class="font-bold text-white mb-3">➕ Nuevo panel de roles</div>
+  <div class="flex items-center justify-between mb-3">
+    <div class="font-bold text-white">➕ Nuevo panel de roles</div>
+    {% if not is_premium %}
+    <span class="text-xs text-slate-400">Plan gratuito: {{ panels_with_options|length }}/{{ FREE_REACTION_PANEL_LIMIT }} panel{{ 'es' if FREE_REACTION_PANEL_LIMIT != 1 else '' }}</span>
+    {% endif %}
+  </div>
+  {% if limite_alcanzado %}
+  <div class="text-sm text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
+    💎 Has alcanzado el límite de paneles del plan gratuito. Hazte Premium desde la pestaña <strong>Premium</strong> para crear paneles ilimitados.
+  </div>
+  {% else %}
   <form method="post" action="{{ url_for('roles_reaccion_crear', guild_id=guild_id) }}" class="grid md:grid-cols-3 gap-3">
     <div>
       <label class="field-label">Canal</label>
@@ -25,6 +36,7 @@
       <button type="submit" class="btn-primary">Crear panel</button>
     </div>
   </form>
+  {% endif %}
 </div>
 
 {% for panel, options in panels_with_options %}

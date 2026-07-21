@@ -65,46 +65,55 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {% for g in guilds %}
   {% set stats = guild_stats.get(g['id'], {}) %}
-  <a href="{{ url_for('guild_detail', guild_id=g['id']) }}" class="card hover:border-orange-600/40 hover:-translate-y-0.5 transition block">
-    <div class="flex items-center gap-3 mb-4">
-      {% if g.get('icon') %}
-        <img src="https://cdn.discordapp.com/icons/{{ g['id'] }}/{{ g['icon'] }}.png" class="w-11 h-11 rounded-xl">
-      {% else %}
-        <div class="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 font-bold">{{ g['name'][:1] }}</div>
-      {% endif %}
-      <div class="min-w-0 flex-1">
-        <div class="font-bold text-white truncate">{{ g['name'] }}</div>
-        <div class="text-xs text-slate-500">ID: {{ g['id'] }}</div>
-      </div>
-      <div class="flex flex-col items-end gap-1 shrink-0">
-        <span class="pill pill-on">🟢 Activo</span>
-        {% if stats.is_premium %}
-        <span class="pill" style="background: rgba(245,158,11,0.15); color:#f59e0b; border-color: rgba(245,158,11,0.3);">💎 Premium</span>
+  <div class="card hover:border-orange-600/40 transition">
+    <a href="{{ url_for('guild_detail', guild_id=g['id']) }}" class="block">
+      <div class="flex items-center gap-3 mb-4">
+        {% if g.get('icon') %}
+          <img src="https://cdn.discordapp.com/icons/{{ g['id'] }}/{{ g['icon'] }}.png" class="w-11 h-11 rounded-xl">
+        {% else %}
+          <div class="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 font-bold">{{ g['name'][:1] }}</div>
         {% endif %}
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-white truncate">{{ g['name'] }}</div>
+          <div class="text-xs text-slate-500">ID: {{ g['id'] }}</div>
+        </div>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          <span class="pill pill-on">🟢 Activo</span>
+          {% if stats.is_premium %}
+          <span class="pill" style="background: rgba(245,158,11,0.15); color:#f59e0b; border-color: rgba(245,158,11,0.3);">💎 Premium</span>
+          {% endif %}
+        </div>
       </div>
-    </div>
 
-    <div class="flex items-center gap-4 text-xs mb-3 flex-wrap">
-      <div>
-        <span class="text-slate-500">Reportes:</span>
-        <span class="font-bold {% if stats.open_reports %}text-orange-400{% else %}text-slate-300{% endif %}">{{ stats.open_reports or 0 }}</span>
+      <div class="flex items-center gap-4 text-xs mb-3 flex-wrap">
+        <div>
+          <span class="text-slate-500">Reportes:</span>
+          <span class="font-bold {% if stats.open_reports %}text-orange-400{% else %}text-slate-300{% endif %}">{{ stats.open_reports or 0 }}</span>
+        </div>
+        <div>
+          <span class="text-slate-500">Incidentes 24h:</span>
+          <span class="font-bold text-slate-300">{{ stats.incidents_24h or 0 }}</span>
+        </div>
+        <div>
+          <span class="text-slate-500">Tareas:</span>
+          <span class="font-bold text-slate-300">{{ stats.pending_tasks or 0 }}</span>
+        </div>
+        <div>
+          <span class="text-slate-500">Tickets:</span>
+          <span class="font-bold {% if stats.open_tickets %}text-orange-400{% else %}text-slate-300{% endif %}">{{ stats.open_tickets or 0 }}</span>
+        </div>
       </div>
-      <div>
-        <span class="text-slate-500">Incidentes 24h:</span>
-        <span class="font-bold text-slate-300">{{ stats.incidents_24h or 0 }}</span>
-      </div>
-      <div>
-        <span class="text-slate-500">Tareas:</span>
-        <span class="font-bold text-slate-300">{{ stats.pending_tasks or 0 }}</span>
-      </div>
-      <div>
-        <span class="text-slate-500">Tickets:</span>
-        <span class="font-bold {% if stats.open_tickets %}text-orange-400{% else %}text-slate-300{% endif %}">{{ stats.open_tickets or 0 }}</span>
-      </div>
-    </div>
+    </a>
 
-    <div class="text-xs text-orange-300 font-semibold">Gestionar servidor →</div>
-  </a>
+    <div class="flex items-center justify-between gap-2">
+      <a href="{{ url_for('guild_detail', guild_id=g['id']) }}" class="text-xs text-orange-300 font-semibold">Gestionar servidor →</a>
+      {% if not stats.is_premium %}
+      <form method="post" action="{{ url_for('premium_checkout', guild_id=g['id']) }}">
+        <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer" style="background:#2ECC71; border:none;">💎 Comprar Premium</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
   {% endfor %}
 </div>
 {% endif %}

@@ -28,6 +28,8 @@ app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET_KEY
 
 CHANNEL_TYPE_TEXT = 0
+FREE_REACTION_PANEL_LIMIT = 1
+FREE_INCIDENT_RETENTION_DAYS = 7
 CHANNEL_TYPE_VOICE = 2
 CHANNEL_TYPE_CATEGORY = 4
 
@@ -451,7 +453,8 @@ def guild_detail(guild_id):
         total, last24h = db.incidents_stats(guild_id)
         return render_template(
             "guild_sanciones.html", tab=tab, guild_id=guild_id, counts=counts,
-            incidents=incidents, total=total, last24h=last24h, **ctx,
+            incidents=incidents, total=total, last24h=last24h,
+            is_premium=db.is_premium(guild_id), FREE_INCIDENT_RETENTION_DAYS=FREE_INCIDENT_RETENTION_DAYS, **ctx,
         )
 
     if tab == "mensajes":
@@ -535,11 +538,15 @@ def guild_detail(guild_id):
             "xp_max": db.get_config(guild_id, "xp_max", 25),
             "xp_cooldown": db.get_config(guild_id, "xp_cooldown", 60),
             "xp_levelup_channel": db.get_config(guild_id, "xp_levelup_channel"),
+            "xp_multiplier": db.get_config(guild_id, "xp_multiplier", "1.0"),
+            "rank_color": db.get_config(guild_id, "rank_color", ""),
         }
         top = db.leaderboard(guild_id, 10)
+        role_rewards = db.list_level_role_rewards(guild_id)
         return render_template(
             "guild_niveles.html", tab=tab, guild_id=guild_id, counts=counts,
-            niveles_cfg=niveles_cfg, top=top, **ctx,
+            niveles_cfg=niveles_cfg, top=top, role_rewards=role_rewards,
+            is_premium=db.is_premium(guild_id), **ctx,
         )
 
     if tab == "sorteos":
@@ -559,11 +566,13 @@ def guild_detail(guild_id):
         tickets_cfg = {
             "category_id": db.get_config(guild_id, "tickets_category_id"),
             "staff_role_id": db.get_config(guild_id, "tickets_staff_role_id"),
+            "transcript_channel_id": db.get_config(guild_id, "tickets_transcript_channel"),
         }
         tickets_list = db.list_tickets(guild_id)
         return render_template(
             "guild_tickets.html", tab=tab, guild_id=guild_id, counts=counts,
-            categories=categories, tickets_cfg=tickets_cfg, tickets_list=tickets_list, **ctx,
+            categories=categories, tickets_cfg=tickets_cfg, tickets_list=tickets_list,
+            is_premium=db.is_premium(guild_id), **ctx,
         )
 
     if tab == "roles-reaccion":
@@ -571,7 +580,8 @@ def guild_detail(guild_id):
         panels_with_options = [(p, db.list_reaction_options(p[0])) for p in panels]
         return render_template(
             "guild_roles_reaccion.html", tab=tab, guild_id=guild_id, counts=counts,
-            panels_with_options=panels_with_options, **ctx,
+            panels_with_options=panels_with_options, is_premium=db.is_premium(guild_id),
+            FREE_REACTION_PANEL_LIMIT=FREE_REACTION_PANEL_LIMIT, **ctx,
         )
 
     return redirect(url_for("guild_detail", guild_id=guild_id, tab="resumen"))
@@ -586,6 +596,8 @@ def guild_detail(guild_id):
 def tickets_config_save(guild_id):
     db.set_config(guild_id, "tickets_category_id", request.form.get("category_id", "").strip())
     db.set_config(guild_id, "tickets_staff_role_id", request.form.get("staff_role_id", "").strip())
+    if db.is_premium(guild_id):
+        db.set_config(guild_id, "tickets_transcript_channel", request.form.get("transcript_channel_id", "").strip())
     flash("Configuración de tickets guardada.", "success")
     return redirect(url_for("guild_detail", guild_id=guild_id, tab="tickets"))
 
@@ -624,6 +636,13 @@ def roles_reaccion_crear(guild_id):
     description = request.form.get("description", "").strip()
     if not channel_id or not title:
         flash("Rellena al menos el canal y el título del panel.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+    if not db.is_premium(guild_id) and len(db.list_reaction_panels(guild_id)) >= FREE_REACTION_PANEL_LIMIT:
+        flash(
+            f"Los servidores gratuitos solo pueden tener {FREE_REACTION_PANEL_LIMIT} panel de roles de reacción. "
+            "Hazte Premium para crear paneles ilimitados.",
+            "error",
+        )
         return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
     db.create_reaction_panel(guild_id, int(channel_id), title, description)
     flash("Panel de roles creado. Ahora añade opciones y publícalo.", "success")
@@ -707,7 +726,45 @@ def niveles_save(guild_id):
     db.set_config(guild_id, "xp_cooldown", request.form.get("xp_cooldown", "60"))
     channel_id = request.form.get("xp_levelup_channel", "").strip()
     db.set_config(guild_id, "xp_levelup_channel", channel_id or "")
+    if db.is_premium(guild_id):
+        try:
+            multiplier = float(request.form.get("xp_multiplier", "1.0").replace(",", "."))
+        except ValueError:
+            multiplier = 1.0
+        db.set_config(guild_id, "xp_multiplier", max(0.1, min(10.0, multiplier)))
+        rank_color = request.form.get("rank_color", "").strip().lstrip("#")
+        db.set_config(guild_id, "rank_color", rank_color)
     flash("Configuración de niveles guardada.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
+
+
+@app.route("/guild/<int:guild_id>/niveles/rol-nivel/add", methods=["POST"])
+@login_required
+@guild_access_required
+def niveles_rol_nivel_add(guild_id):
+    if not db.is_premium(guild_id):
+        flash("Los roles de recompensa por nivel son una función Premium.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
+    try:
+        level = int(request.form.get("level", "").strip())
+    except ValueError:
+        flash("Indica un nivel válido.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
+    role_id = request.form.get("role_id", "").strip()
+    if not role_id:
+        flash("Elige un rol.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
+    db.set_level_role_reward(guild_id, level, int(role_id))
+    flash(f"Recompensa del nivel {level} guardada.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
+
+
+@app.route("/guild/<int:guild_id>/niveles/rol-nivel/<int:level>/eliminar", methods=["POST"])
+@login_required
+@guild_access_required
+def niveles_rol_nivel_eliminar(guild_id, level):
+    db.remove_level_role_reward(guild_id, level)
+    flash("Recompensa eliminada.", "success")
     return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
 
 

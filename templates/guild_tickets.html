@@ -24,6 +24,25 @@
           {% endfor %}
         </select>
       </div>
+      <div>
+        <label class="field-label flex items-center gap-1.5">
+          Canal de transcripciones
+          <span class="pill" style="background: rgba(245,158,11,0.15); color:#f59e0b;">💎 Premium</span>
+        </label>
+        {% if is_premium %}
+        <select name="transcript_channel_id">
+          <option value="">Enviar por MD al usuario que abrió el ticket</option>
+          {% for c in text_channels %}
+            <option value="{{ c.id }}" {{ "selected" if tickets_cfg.transcript_channel_id == c.id|string }}>#{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-slate-500 mt-1">Al cerrar un ticket, se enviará aquí un archivo .txt con toda la conversación.</p>
+        {% else %}
+        <select disabled class="opacity-50 cursor-not-allowed">
+          <option>Hazte Premium para guardar la conversación de cada ticket</option>
+        </select>
+        {% endif %}
+      </div>
       <button type="submit" class="btn-primary">Guardar</button>
     </form>
   </div>

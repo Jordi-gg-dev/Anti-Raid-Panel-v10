@@ -158,6 +158,12 @@ _conn.executescript(
         label TEXT NOT NULL,
         emoji TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS level_role_rewards (
+        guild_id INTEGER NOT NULL,
+        level INTEGER NOT NULL,
+        role_id INTEGER NOT NULL,
+        PRIMARY KEY (guild_id, level)
+    );
     """
 )
 _conn.commit()
@@ -607,6 +613,27 @@ def leaderboard_rank(guild_id: int, user_id: int) -> int:
         (guild_id, guild_id, user_id),
     )
     return row[0] if row else 1
+
+
+# ---------------------------------------------------------------------------
+# Roles de recompensa por nivel (funcion Premium)
+# ---------------------------------------------------------------------------
+def set_level_role_reward(guild_id: int, level: int, role_id: int) -> None:
+    _execute(
+        "INSERT INTO level_role_rewards (guild_id, level, role_id) VALUES (?, ?, ?) "
+        "ON CONFLICT(guild_id, level) DO UPDATE SET role_id=excluded.role_id",
+        (guild_id, level, role_id),
+    )
+
+
+def remove_level_role_reward(guild_id: int, level: int) -> None:
+    _execute("DELETE FROM level_role_rewards WHERE guild_id=? AND level=?", (guild_id, level))
+
+
+def list_level_role_rewards(guild_id: int):
+    return _fetchall(
+        "SELECT level, role_id FROM level_role_rewards WHERE guild_id=? ORDER BY level ASC", (guild_id,)
+    )
 
 
 # ---------------------------------------------------------------------------

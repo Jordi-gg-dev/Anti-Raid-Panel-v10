@@ -13,11 +13,18 @@
   </div>
 </div>
 
-<div class="flex items-center justify-between mb-4">
+<div class="flex items-center justify-between mb-2">
   <div class="text-sm text-slate-400">Sanciones automáticas aplicadas por el bot en este servidor.</div>
   <form method="post" action="{{ url_for('guild_incidents_clear', guild_id=guild_id) }}" onsubmit="return confirm('¿Borrar todo el historial?');">
     <button type="submit" class="btn-danger">🗑️ Borrar historial</button>
   </form>
+</div>
+<div class="mb-4">
+  {% if is_premium %}
+  <span class="text-xs text-slate-500">💎 Premium: historial ilimitado.</span>
+  {% else %}
+  <span class="text-xs text-slate-500">Plan gratuito: solo se conservan los últimos {{ FREE_INCIDENT_RETENTION_DAYS }} días de historial. <a href="{{ url_for('guild_detail', guild_id=guild_id, tab='premium') }}" class="text-amber-400 font-semibold hover:underline">Hazte Premium</a> para guardarlo todo.</span>
+  {% endif %}
 </div>
 
 {% if not incidents %}
