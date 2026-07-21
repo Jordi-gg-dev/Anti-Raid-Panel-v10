@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-3">➕ Nuevo panel de roles</div>
+  <form method="post" action="{{ url_for('roles_reaccion_crear', guild_id=guild_id) }}" class="grid md:grid-cols-3 gap-3">
+    <div>
+      <label class="field-label">Canal</label>
+      <select name="channel_id" required>
+        {% for c in text_channels %}
+          <option value="{{ c.id }}">#{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="field-label">Título</label>
+      <input type="text" name="title" placeholder="Elige tus roles" required>
+    </div>
+    <div>
+      <label class="field-label">Descripción (opcional)</label>
+      <input type="text" name="description" placeholder="Pulsa un botón para obtener el rol">
+    </div>
+    <div class="md:col-span-3">
+      <button type="submit" class="btn-primary">Crear panel</button>
+    </div>
+  </form>
+</div>
+
+{% for panel, options in panels_with_options %}
+{% set panel_id = panel[0] %}
+<div class="card mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <div class="font-bold text-white">{{ panel[4] }}</div>
+      <div class="text-xs text-slate-400">{{ panel[5] }}</div>
+    </div>
+    <div class="flex gap-2">
+      <form method="post" action="{{ url_for('roles_reaccion_publicar', guild_id=guild_id, panel_id=panel_id) }}">
+        <button type="submit" class="btn-primary">{{ "Publicar de nuevo" if panel[3] else "Publicar" }}</button>
+      </form>
+      <form method="post" action="{{ url_for('roles_reaccion_eliminar', guild_id=guild_id, panel_id=panel_id) }}">
+        <button type="submit" class="btn-danger">Eliminar</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="space-y-2 mb-3">
+    {% for opt_id, _pid, role_id, label, emoji in options %}
+    <div class="flex items-center justify-between text-sm bg-white/5 rounded-lg px-3 py-2">
+      <span>{{ emoji }} {{ label }} — <span class="text-slate-400">rol {{ role_id }}</span></span>
+      <form method="post" action="{{ url_for('roles_reaccion_opcion_eliminar', guild_id=guild_id, panel_id=panel_id, option_id=opt_id) }}">
+        <button type="submit" class="text-xs text-red-400 hover:text-red-300 font-semibold">Quitar</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="text-xs text-slate-400">Sin opciones todavía.</div>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="{{ url_for('roles_reaccion_opcion', guild_id=guild_id, panel_id=panel_id) }}" class="grid md:grid-cols-4 gap-2">
+    <select name="role_id" required>
+      {% for r in roles %}
+        <option value="{{ r.id }}">@{{ r.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="label" placeholder="Etiqueta del botón" required>
+    <input type="text" name="emoji" placeholder="Emoji (opcional)">
+    <button type="submit" class="btn-ghost">Añadir opción</button>
+  </form>
+</div>
+{% else %}
+<div class="card text-center text-slate-400">Todavía no has creado ningún panel de roles.</div>
+{% endfor %}
+{% endblock %}

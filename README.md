@@ -72,6 +72,18 @@ Son dos procesos independientes (dos pestañas de terminal, dos `venv` separados
 - **Backups** — crear, restaurar y borrar copias de seguridad de canales/roles.
 - **Global** — bloquear servidores o usuarios a nivel de todo el bot.
 
+### Funciones Premium (de pago, vía Stripe)
+
+- **Premium** — activar la suscripción del servidor (Stripe Checkout) y gestionarla (portal de facturación, cancelar, ver estado).
+- **Comandos personalizados** — crear disparadores de texto con respuesta automática (solo servidores premium).
+- **Perfil de bot** — apodo personalizado del bot en ese servidor (solo servidores premium).
+- **Niveles** — XP por mensaje, subida de nivel automática, anuncio de subida de nivel, tabla de clasificación.
+- **Sorteos** — crear sorteos con botón de participación, cierre automático o manual, elección de ganadores.
+- **Tickets** — panel con botón para abrir tickets de soporte en canales privados, con cierre por staff.
+- **Roles de reacción** — paneles con botones para que los miembros se autoasignen roles.
+
+El dashboard principal muestra ahora una insignia 💎 junto a cada servidor con Premium activo, además del contador de tickets abiertos.
+
 ## Seguridad
 
 - No expongas este panel a internet tal cual (está pensado para `localhost`). Si algún día quieres acceder desde fuera de tu casa, hazlo por una VPN o un túnel con autenticación adicional (ej. Cloudflare Tunnel con Access) — no lo publiques abierto en un puerto de tu router.

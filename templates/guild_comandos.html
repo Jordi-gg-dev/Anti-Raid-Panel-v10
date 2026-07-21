@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+{% if not is_premium %}
+<div class="card text-center">
+  <div class="text-3xl mb-2">💎</div>
+  <div class="font-bold text-white mb-1">Función Premium</div>
+  <div class="text-sm text-slate-400 mb-4">Los comandos personalizados solo están disponibles para servidores con Premium activo.</div>
+  <a href="{{ url_for('guild_detail', guild_id=guild_id, tab='premium') }}" class="btn-primary">Ver Premium</a>
+</div>
+{% else %}
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-3">➕ Nuevo comando</div>
+  <form method="post" action="{{ url_for('comandos_add', guild_id=guild_id) }}" class="grid md:grid-cols-2 gap-3">
+    <div>
+      <label class="field-label">Disparador (sin el !)</label>
+      <input type="text" name="trigger" placeholder="ej. reglas" required maxlength="50">
+    </div>
+    <div>
+      <label class="field-label">Respuesta del bot</label>
+      <input type="text" name="response" placeholder="Texto que enviará el bot" required maxlength="1500">
+    </div>
+    <div class="md:col-span-2">
+      <button type="submit" class="btn-primary">Crear comando</button>
+    </div>
+  </form>
+</div>
+
+<div class="space-y-2">
+  {% for cid, trigger_text, response, enabled, created_at in commands_list %}
+  <div class="card !py-3 flex items-center justify-between gap-3">
+    <div class="min-w-0">
+      <div class="text-sm font-bold text-white">!{{ trigger_text }}</div>
+      <div class="text-xs text-slate-400 truncate">{{ response }}</div>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <span class="pill {{ 'pill-on' if enabled else 'pill-off' }}">{{ 'Activo' if enabled else 'Desactivado' }}</span>
+      <form method="post" action="{{ url_for('comandos_toggle', guild_id=guild_id, command_id=cid) }}">
+        <button type="submit" class="btn-ghost">{{ 'Desactivar' if enabled else 'Activar' }}</button>
+      </form>
+      <form method="post" action="{{ url_for('comandos_delete', guild_id=guild_id, command_id=cid) }}">
+        <button type="submit" class="btn-danger">Eliminar</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="card text-center text-slate-400">Todavía no has creado ningún comando.</div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

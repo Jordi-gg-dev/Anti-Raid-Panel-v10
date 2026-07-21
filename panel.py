@@ -22,6 +22,7 @@ from flask import Flask, redirect, render_template, request, session, url_for, f
 import panel_config as config
 import db
 import discord_api as api
+import stripe_client
 
 app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET_KEY
@@ -41,6 +42,13 @@ TABS = [
     ("analiticas", "Analíticas", "bar-chart"),
     ("config", "Configuración", "settings"),
     ("backups", "Backups", "file-text"),
+    ("premium", "Premium", "diamond"),
+    ("comandos", "Comandos", "code"),
+    ("perfil", "Perfil de Bot", "user-circle"),
+    ("niveles", "Niveles", "bar-chart"),
+    ("sorteos", "Sorteos", "activity"),
+    ("tickets", "Tickets", "message-square"),
+    ("roles-reaccion", "Roles Reacción", "users"),
 ]
 
 
@@ -130,6 +138,7 @@ def inject_globals():
         "custom_css": custom.get("custom_css", ""),
         "custom_js": custom.get("custom_js", ""),
         "is_owner": _is_owner(session.get("user_id")) if "user_id" in session else False,
+        "support_server_invite": config.SUPPORT_SERVER_INVITE,
     }
 
 
@@ -211,19 +220,25 @@ def dashboard():
     total_open_reports = 0
     total_incidents_24h = 0
     total_pending_tasks = 0
+    total_premium_guilds = 0
     for g in guilds:
         gid = int(g["id"])
         _, open_reports, _ = db.report_stats(gid)
         _, incidents_24h = db.incidents_stats(gid)
         pending_tasks = db.tasks_pending_count(gid)
+        is_prem = db.is_premium(gid)
         guild_stats[g["id"]] = {
             "open_reports": open_reports,
             "incidents_24h": incidents_24h,
             "pending_tasks": pending_tasks,
+            "is_premium": is_prem,
+            "open_tickets": db.tickets_open_count(gid),
         }
         total_open_reports += open_reports
         total_incidents_24h += incidents_24h
         total_pending_tasks += pending_tasks
+        if is_prem:
+            total_premium_guilds += 1
 
     return render_template(
         "dashboard.html",
@@ -233,6 +248,7 @@ def dashboard():
         total_open_reports=total_open_reports,
         total_incidents_24h=total_incidents_24h,
         total_pending_tasks=total_pending_tasks,
+        total_premium_guilds=total_premium_guilds,
         is_filtered_view=not _is_owner(session.get("user_id")),
     )
 
@@ -488,7 +504,404 @@ def guild_detail(guild_id):
         backups = db.list_backups(guild_id)
         return render_template("guild_backups.html", tab=tab, guild_id=guild_id, counts=counts, backups=backups, **ctx)
 
+    if tab == "premium":
+        premium_row = db.get_premium(guild_id)
+        checkout_result = request.args.get("checkout")
+        return render_template(
+            "guild_premium.html", tab=tab, guild_id=guild_id, counts=counts,
+            premium=premium_row, is_premium=db.is_premium(guild_id),
+            stripe_configured=bool(config.STRIPE_SECRET_KEY and config.STRIPE_PRICE_ID),
+            checkout_result=checkout_result, **ctx,
+        )
+
+    if tab == "comandos":
+        commands_list = db.list_custom_commands(guild_id)
+        return render_template(
+            "guild_comandos.html", tab=tab, guild_id=guild_id, counts=counts,
+            commands_list=commands_list, is_premium=db.is_premium(guild_id), **ctx,
+        )
+
+    if tab == "perfil":
+        profile = db.get_bot_profile(guild_id)
+        return render_template(
+            "guild_perfil.html", tab=tab, guild_id=guild_id, counts=counts,
+            profile=profile, is_premium=db.is_premium(guild_id), **ctx,
+        )
+
+    if tab == "niveles":
+        niveles_cfg = {
+            "xp_enabled": db.get_bool(guild_id, "xp_enabled", True),
+            "xp_min": db.get_config(guild_id, "xp_min", 15),
+            "xp_max": db.get_config(guild_id, "xp_max", 25),
+            "xp_cooldown": db.get_config(guild_id, "xp_cooldown", 60),
+            "xp_levelup_channel": db.get_config(guild_id, "xp_levelup_channel"),
+        }
+        top = db.leaderboard(guild_id, 10)
+        return render_template(
+            "guild_niveles.html", tab=tab, guild_id=guild_id, counts=counts,
+            niveles_cfg=niveles_cfg, top=top, **ctx,
+        )
+
+    if tab == "sorteos":
+        giveaways = db.list_giveaways(guild_id)
+        giveaway_entry_counts = {g[0]: db.count_giveaway_entries(g[0]) for g in giveaways}
+        return render_template(
+            "guild_sorteos.html", tab=tab, guild_id=guild_id, counts=counts,
+            giveaways=giveaways, giveaway_entry_counts=giveaway_entry_counts, **ctx,
+        )
+
+    if tab == "tickets":
+        try:
+            all_channels = api.get_guild_channels(config.BOT_TOKEN, guild_id)
+        except api.DiscordAPIError:
+            all_channels = []
+        categories = [c for c in all_channels if c.get("type") == CHANNEL_TYPE_CATEGORY]
+        tickets_cfg = {
+            "category_id": db.get_config(guild_id, "tickets_category_id"),
+            "staff_role_id": db.get_config(guild_id, "tickets_staff_role_id"),
+        }
+        tickets_list = db.list_tickets(guild_id)
+        return render_template(
+            "guild_tickets.html", tab=tab, guild_id=guild_id, counts=counts,
+            categories=categories, tickets_cfg=tickets_cfg, tickets_list=tickets_list, **ctx,
+        )
+
+    if tab == "roles-reaccion":
+        panels = db.list_reaction_panels(guild_id)
+        panels_with_options = [(p, db.list_reaction_options(p[0])) for p in panels]
+        return render_template(
+            "guild_roles_reaccion.html", tab=tab, guild_id=guild_id, counts=counts,
+            panels_with_options=panels_with_options, **ctx,
+        )
+
     return redirect(url_for("guild_detail", guild_id=guild_id, tab="resumen"))
+
+
+# ---------------------------------------------------------------------------
+# Tickets
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/tickets/config", methods=["POST"])
+@login_required
+@guild_access_required
+def tickets_config_save(guild_id):
+    db.set_config(guild_id, "tickets_category_id", request.form.get("category_id", "").strip())
+    db.set_config(guild_id, "tickets_staff_role_id", request.form.get("staff_role_id", "").strip())
+    flash("Configuración de tickets guardada.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="tickets"))
+
+
+@app.route("/guild/<int:guild_id>/tickets/publicar", methods=["POST"])
+@login_required
+@guild_access_required
+def tickets_publicar(guild_id):
+    channel_id = request.form.get("channel_id", "").strip()
+    if not channel_id:
+        flash("Elige un canal donde publicar el panel de tickets.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="tickets"))
+    try:
+        api.send_message_with_buttons(
+            config.BOT_TOKEN, int(channel_id),
+            "🎫 Soporte",
+            "¿Necesitas ayuda? Pulsa el botón de abajo para abrir un ticket privado con el staff.",
+            [{"label": "Abrir ticket", "custom_id": "astrocube:ticket:abrir", "emoji": "🎫"}],
+        )
+    except api.DiscordAPIError as exc:
+        flash(f"No se pudo publicar el panel: {exc}", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="tickets"))
+    flash("Panel de tickets publicado.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="tickets"))
+
+
+# ---------------------------------------------------------------------------
+# Roles de reaccion / boton
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/roles-reaccion/crear", methods=["POST"])
+@login_required
+@guild_access_required
+def roles_reaccion_crear(guild_id):
+    channel_id = request.form.get("channel_id", "").strip()
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+    if not channel_id or not title:
+        flash("Rellena al menos el canal y el título del panel.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+    db.create_reaction_panel(guild_id, int(channel_id), title, description)
+    flash("Panel de roles creado. Ahora añade opciones y publícalo.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+
+@app.route("/guild/<int:guild_id>/roles-reaccion/<int:panel_id>/opcion", methods=["POST"])
+@login_required
+@guild_access_required
+def roles_reaccion_opcion(guild_id, panel_id):
+    role_id = request.form.get("role_id", "").strip()
+    label = request.form.get("label", "").strip()
+    emoji = request.form.get("emoji", "").strip()
+    if not role_id or not label:
+        flash("Rellena el rol y la etiqueta de la opción.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+    db.add_reaction_option(panel_id, int(role_id), label, emoji)
+    flash("Opción añadida.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+
+@app.route("/guild/<int:guild_id>/roles-reaccion/<int:panel_id>/opcion/<int:option_id>/eliminar", methods=["POST"])
+@login_required
+@guild_access_required
+def roles_reaccion_opcion_eliminar(guild_id, panel_id, option_id):
+    db.delete_reaction_option(option_id)
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+
+@app.route("/guild/<int:guild_id>/roles-reaccion/<int:panel_id>/publicar", methods=["POST"])
+@login_required
+@guild_access_required
+def roles_reaccion_publicar(guild_id, panel_id):
+    panel_row = db.get_reaction_panel(panel_id)
+    if panel_row is None or panel_row[1] != guild_id:
+        flash("Ese panel no existe.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+    options = db.list_reaction_options(panel_id)
+    if not options:
+        flash("Añade al menos una opción antes de publicar.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+    buttons = [
+        {"label": label, "custom_id": f"astrocube:rrole:{panel_id}:{opt_id}:{role_id}", "emoji": emoji}
+        for opt_id, _panel_id, role_id, label, emoji in options
+    ]
+
+    try:
+        result = api.send_message_with_buttons(
+            config.BOT_TOKEN, panel_row[2], panel_row[4], panel_row[5] or "Elige tus roles pulsando un botón.", buttons
+        )
+    except api.DiscordAPIError as exc:
+        flash(f"No se pudo publicar el panel: {exc}", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+    db.set_reaction_panel_message(panel_id, result.get("id"))
+    flash("Panel de roles publicado. El bot tiene que estar en marcha para que los botones respondan.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+
+@app.route("/guild/<int:guild_id>/roles-reaccion/<int:panel_id>/eliminar", methods=["POST"])
+@login_required
+@guild_access_required
+def roles_reaccion_eliminar(guild_id, panel_id):
+    db.delete_reaction_panel(panel_id, guild_id)
+    flash("Panel eliminado de la base de datos (borra también el mensaje en Discord manualmente si hace falta).", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="roles-reaccion"))
+
+
+# ---------------------------------------------------------------------------
+# Niveles (XP)
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/niveles/save", methods=["POST"])
+@login_required
+@guild_access_required
+def niveles_save(guild_id):
+    db.set_config(guild_id, "xp_enabled", "1" if request.form.get("xp_enabled") == "on" else "0")
+    db.set_config(guild_id, "xp_min", request.form.get("xp_min", "15"))
+    db.set_config(guild_id, "xp_max", request.form.get("xp_max", "25"))
+    db.set_config(guild_id, "xp_cooldown", request.form.get("xp_cooldown", "60"))
+    channel_id = request.form.get("xp_levelup_channel", "").strip()
+    db.set_config(guild_id, "xp_levelup_channel", channel_id or "")
+    flash("Configuración de niveles guardada.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="niveles"))
+
+
+# ---------------------------------------------------------------------------
+# Sorteos (giveaways) - el panel puede finalizar uno antes de tiempo usando
+# solo la API REST del bot (no necesita que el bot este conectado por gateway).
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/sorteos/<int:giveaway_id>/terminar", methods=["POST"])
+@login_required
+@guild_access_required
+def sorteos_terminar(guild_id, giveaway_id):
+    import random
+
+    row = db.get_giveaway(giveaway_id)
+    if row is None or row[1] != guild_id:
+        flash("Ese sorteo no existe en este servidor.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="sorteos"))
+    if row[8]:
+        flash("Ese sorteo ya había terminado.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="sorteos"))
+
+    _, _, channel_id, message_id, prize, winners_count, host_id, ends_at, ended, winners, created_at = row
+    entries = db.list_giveaway_entries(giveaway_id)
+    ganadores = random.sample(entries, min(winners_count, len(entries))) if entries else []
+    db.finish_giveaway(giveaway_id, ganadores)
+
+    try:
+        if ganadores:
+            texto = f"🎉 ¡Felicidades {', '.join(f'<@{w}>' for w in ganadores)}! Habéis ganado **{prize}**. (Finalizado desde el panel)"
+        else:
+            texto = f"El sorteo de **{prize}** ha terminado sin participantes. (Finalizado desde el panel)"
+        api.send_embed(config.BOT_TOKEN, channel_id, "🎉 Sorteo finalizado", texto)
+    except api.DiscordAPIError as exc:
+        flash(f"El sorteo se marcó como terminado, pero no se pudo avisar en Discord: {exc}", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="sorteos"))
+
+    flash("Sorteo finalizado y ganadores anunciados.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="sorteos"))
+
+
+# ---------------------------------------------------------------------------
+# Premium (Stripe)
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/premium/checkout", methods=["POST"])
+@login_required
+@guild_access_required
+def premium_checkout(guild_id):
+    try:
+        guild = api.get_guild(config.BOT_TOKEN, guild_id)
+        guild_name = guild.get("name", str(guild_id))
+    except api.DiscordAPIError:
+        guild_name = str(guild_id)
+
+    existing = db.get_premium(guild_id)
+    existing_customer_id = existing[1] if existing else None
+
+    try:
+        checkout_url = stripe_client.create_checkout_session(guild_id, guild_name, existing_customer_id)
+    except stripe_client.StripeNotConfigured as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
+    except Exception as exc:
+        flash(f"Error creando el checkout de Stripe: {exc}", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
+
+    return redirect(checkout_url)
+
+
+@app.route("/guild/<int:guild_id>/premium/portal", methods=["POST"])
+@login_required
+@guild_access_required
+def premium_portal(guild_id):
+    existing = db.get_premium(guild_id)
+    if not existing or not existing[1]:
+        flash("Este servidor todavía no tiene una suscripción de Stripe asociada.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
+
+    try:
+        portal_url = stripe_client.create_billing_portal_session(existing[1], guild_id)
+    except Exception as exc:
+        flash(f"Error abriendo el portal de facturación: {exc}", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
+
+    return redirect(portal_url)
+
+
+@app.route("/stripe/webhook", methods=["POST"])
+def stripe_webhook():
+    """Endpoint publico que llama Stripe directamente (sin sesion de usuario).
+    Verifica la firma con STRIPE_WEBHOOK_SECRET antes de fiarse de nada."""
+    payload = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    try:
+        event = stripe_client.construct_webhook_event(payload, sig_header)
+    except Exception as exc:
+        return {"error": str(exc)}, 400
+
+    event_type = event["type"]
+    data_object = event["data"]["object"]
+
+    if event_type == "checkout.session.completed":
+        guild_id = data_object.get("client_reference_id") or (data_object.get("metadata") or {}).get("guild_id")
+        customer_id = data_object.get("customer")
+        subscription_id = data_object.get("subscription")
+        if guild_id:
+            db.upsert_premium(int(guild_id), "active", stripe_customer_id=customer_id, stripe_subscription_id=subscription_id)
+
+    elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
+        subscription_id = data_object.get("id")
+        customer_id = data_object.get("customer")
+        status = data_object.get("status")  # active, past_due, canceled, unpaid, trialing...
+        period_end = data_object.get("current_period_end")
+        guild_id = (data_object.get("metadata") or {}).get("guild_id")
+        existing = db.get_premium_by_subscription(subscription_id) or (db.get_premium_by_customer(customer_id) if customer_id else None)
+        target_guild_id = int(guild_id) if guild_id else (existing[0] if existing else None)
+        if target_guild_id:
+            db.upsert_premium(
+                target_guild_id,
+                "active" if status in ("active", "trialing") else status,
+                stripe_customer_id=customer_id,
+                stripe_subscription_id=subscription_id,
+                current_period_end=period_end,
+            )
+
+    elif event_type == "customer.subscription.deleted":
+        subscription_id = data_object.get("id")
+        existing = db.get_premium_by_subscription(subscription_id)
+        if existing:
+            db.upsert_premium(existing[0], "canceled", stripe_subscription_id=subscription_id)
+
+    return {"received": True}, 200
+
+
+# ---------------------------------------------------------------------------
+# Comandos personalizados (Premium)
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/comandos/add", methods=["POST"])
+@login_required
+@guild_access_required
+def comandos_add(guild_id):
+    if not db.is_premium(guild_id):
+        flash("Los comandos personalizados son una función Premium. Suscribe este servidor primero.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
+
+    trigger_text = request.form.get("trigger", "").strip()
+    response = request.form.get("response", "").strip()
+    if not trigger_text or not response:
+        flash("Rellena el disparador y la respuesta del comando.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="comandos"))
+
+    db.add_custom_command(guild_id, trigger_text, response)
+    flash(f"Comando \"!{trigger_text.lower()}\" creado.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="comandos"))
+
+
+@app.route("/guild/<int:guild_id>/comandos/<int:command_id>/toggle", methods=["POST"])
+@login_required
+@guild_access_required
+def comandos_toggle(guild_id, command_id):
+    db.toggle_custom_command(command_id, guild_id)
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="comandos"))
+
+
+@app.route("/guild/<int:guild_id>/comandos/<int:command_id>/delete", methods=["POST"])
+@login_required
+@guild_access_required
+def comandos_delete(guild_id, command_id):
+    db.delete_custom_command(command_id, guild_id)
+    flash("Comando eliminado.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="comandos"))
+
+
+# ---------------------------------------------------------------------------
+# Perfil personalizado del bot (Premium)
+# ---------------------------------------------------------------------------
+@app.route("/guild/<int:guild_id>/perfil/save", methods=["POST"])
+@login_required
+@guild_access_required
+def perfil_save(guild_id):
+    if not db.is_premium(guild_id):
+        flash("Personalizar el perfil del bot es una función Premium. Suscribe este servidor primero.", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="premium"))
+
+    nickname = request.form.get("nickname", "").strip()[:32]
+    try:
+        api.set_bot_nickname(config.BOT_TOKEN, guild_id, nickname)
+    except api.DiscordAPIError as exc:
+        flash(f"No se pudo cambiar el apodo en Discord: {exc}", "error")
+        return redirect(url_for("guild_detail", guild_id=guild_id, tab="perfil"))
+
+    db.set_bot_profile_nickname(guild_id, nickname)
+    flash("Apodo del bot actualizado en este servidor.", "success")
+    return redirect(url_for("guild_detail", guild_id=guild_id, tab="perfil"))
 
 
 # ---------------------------------------------------------------------------

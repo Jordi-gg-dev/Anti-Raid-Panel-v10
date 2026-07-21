@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+{% if not is_premium %}
+<div class="card text-center">
+  <div class="text-3xl mb-2">💎</div>
+  <div class="font-bold text-white mb-1">Función Premium</div>
+  <div class="text-sm text-slate-400 mb-4">Personalizar el perfil del bot en tu servidor solo está disponible con Premium activo.</div>
+  <a href="{{ url_for('guild_detail', guild_id=guild_id, tab='premium') }}" class="btn-primary">Ver Premium</a>
+</div>
+{% else %}
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-1">Apodo del bot en este servidor</div>
+  <div class="text-sm text-slate-400 mb-4">
+    Discord no permite un avatar distinto por servidor para el mismo bot, pero sí puedes darle
+    un apodo propio aquí (por ejemplo, el nombre de tu comunidad).
+  </div>
+  <form method="post" action="{{ url_for('perfil_save', guild_id=guild_id) }}" class="flex gap-2">
+    <input type="text" name="nickname" maxlength="32" placeholder="ej. Guardián de Pixelboom"
+           value="{{ profile[1] if profile else '' }}">
+    <button type="submit" class="btn-primary shrink-0">Guardar</button>
+  </form>
+</div>
+
+<div class="card !border-amber-500/30 !bg-amber-500/5">
+  <div class="text-sm text-slate-300">
+    ¿Quieres un bot con su propio avatar, nombre y personalidad completamente distintos
+    (no solo el apodo)? Eso requiere usar tu propia aplicación de bot en el Discord Developer
+    Portal en vez del bot compartido. Es una función más avanzada que podemos añadir en una
+    fase futura si te interesa.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

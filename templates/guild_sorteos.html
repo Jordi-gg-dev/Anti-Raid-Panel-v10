@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="card mb-6 !border-amber-500/30 !bg-amber-500/5">
+  <div class="text-sm text-slate-300">
+    Los sorteos se crean con el comando <code>/sorteo crear</code> desde Discord (necesitan un botón en vivo
+    en un canal). Desde aquí puedes ver el estado de todos los sorteos y finalizarlos antes de tiempo si hace falta.
+  </div>
+</div>
+
+<div class="space-y-3">
+  {% for gid, gguild, channel_id, message_id, prize, winners_count, host_id, ends_at, ended, winners, created_at in giveaways %}
+  <div class="card">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <div class="font-bold text-white">🎉 {{ prize }}</div>
+        <div class="text-xs text-slate-400 mt-1">
+          Canal: #{{ channel_id }} · Ganadores: {{ winners_count }} · Participantes: {{ giveaway_entry_counts.get(gid, 0) }}
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        {% if ended %}
+          <span class="pill pill-off">Terminado</span>
+          {% if winners %}
+            <span class="text-xs text-slate-400">Ganador(es): {{ winners }}</span>
+          {% endif %}
+        {% else %}
+          <span class="pill pill-on">Activo</span>
+          <form method="post" action="{{ url_for('sorteos_terminar', guild_id=guild_id, giveaway_id=gid) }}">
+            <button type="submit" class="btn-danger">Terminar ahora</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card text-center text-slate-400">Todavía no se ha creado ningún sorteo en este servidor.</div>
+  {% endfor %}
+</div>
+{% endblock %}

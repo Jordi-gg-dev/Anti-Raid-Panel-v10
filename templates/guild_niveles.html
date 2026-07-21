@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-3">⚙️ Configuración del sistema de niveles</div>
+  <form method="post" action="{{ url_for('niveles_save', guild_id=guild_id) }}" class="space-y-4">
+    <label class="flex items-center gap-3">
+      <span class="toggle">
+        <input type="checkbox" name="xp_enabled" {{ "checked" if niveles_cfg.xp_enabled }}>
+        <span class="slider"></span>
+      </span>
+      <span class="text-sm text-slate-200">Sistema de niveles activado</span>
+    </label>
+
+    <div class="grid md:grid-cols-3 gap-3">
+      <div>
+        <label class="field-label">XP mínimo por mensaje</label>
+        <input type="number" name="xp_min" value="{{ niveles_cfg.xp_min }}" min="1">
+      </div>
+      <div>
+        <label class="field-label">XP máximo por mensaje</label>
+        <input type="number" name="xp_max" value="{{ niveles_cfg.xp_max }}" min="1">
+      </div>
+      <div>
+        <label class="field-label">Cooldown entre mensajes (segundos)</label>
+        <input type="number" name="xp_cooldown" value="{{ niveles_cfg.xp_cooldown }}" min="0">
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">Canal para anunciar subidas de nivel</label>
+      <select name="xp_levelup_channel">
+        <option value="">Mismo canal donde escribió el mensaje</option>
+        {% for c in text_channels %}
+          <option value="{{ c.id }}" {{ "selected" if niveles_cfg.xp_levelup_channel == c.id|string }}>#{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn-primary">Guardar</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="font-bold text-white mb-3">🏆 Clasificación (top 10)</div>
+  {% if top %}
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-slate-400">
+        <th class="py-2">#</th>
+        <th>Usuario</th>
+        <th>Nivel</th>
+        <th>XP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user_id, username, xp, level in top %}
+      <tr class="border-t border-white/5">
+        <td class="py-2">{{ loop.index }}</td>
+        <td>{{ username }}</td>
+        <td>{{ level }}</td>
+        <td>{{ xp }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="text-center text-slate-400">Todavía no hay nadie con XP en este servidor.</div>
+  {% endif %}
+</div>
+{% endblock %}

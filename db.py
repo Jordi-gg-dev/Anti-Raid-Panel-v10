@@ -84,6 +84,80 @@ _conn.executescript(
         visits INTEGER NOT NULL DEFAULT 1,
         PRIMARY KEY (guild_id, user_id)
     );
+    CREATE TABLE IF NOT EXISTS premium_guilds (
+        guild_id INTEGER PRIMARY KEY,
+        stripe_customer_id TEXT,
+        stripe_subscription_id TEXT,
+        status TEXT NOT NULL DEFAULT 'inactive',
+        current_period_end INTEGER,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS custom_commands (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER NOT NULL,
+        trigger_text TEXT NOT NULL,
+        response TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS bot_profile (
+        guild_id INTEGER PRIMARY KEY,
+        nickname TEXT,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS user_levels (
+        guild_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        username TEXT,
+        xp INTEGER NOT NULL DEFAULT 0,
+        level INTEGER NOT NULL DEFAULT 0,
+        last_message_at INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (guild_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS giveaways (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER NOT NULL,
+        channel_id INTEGER NOT NULL,
+        message_id INTEGER,
+        prize TEXT NOT NULL,
+        winners_count INTEGER NOT NULL DEFAULT 1,
+        host_id INTEGER,
+        ends_at INTEGER NOT NULL,
+        ended INTEGER NOT NULL DEFAULT 0,
+        winners TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS giveaway_entries (
+        giveaway_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (giveaway_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER NOT NULL,
+        channel_id INTEGER,
+        user_id INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        created_at INTEGER NOT NULL,
+        closed_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS reaction_role_panels (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER NOT NULL,
+        channel_id INTEGER NOT NULL,
+        message_id INTEGER,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS reaction_role_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        panel_id INTEGER NOT NULL,
+        role_id INTEGER NOT NULL,
+        label TEXT NOT NULL,
+        emoji TEXT NOT NULL DEFAULT ''
+    );
     """
 )
 _conn.commit()
@@ -384,3 +458,328 @@ def list_all_guild_access():
     return _fetchall(
         "SELECT guild_id, user_id, username, first_seen, last_seen, visits FROM guild_access_log ORDER BY last_seen DESC"
     )
+
+
+# ---------------------------------------------------------------------------
+# Premium (Stripe) por servidor
+# ---------------------------------------------------------------------------
+def get_premium(guild_id: int):
+    return _fetchone(
+        "SELECT guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at "
+        "FROM premium_guilds WHERE guild_id=?",
+        (guild_id,),
+    )
+
+
+def is_premium(guild_id: int) -> bool:
+    row = get_premium(guild_id)
+    return bool(row and row[3] == "active")
+
+
+def upsert_premium(guild_id: int, status: str, stripe_customer_id: str = None,
+                    stripe_subscription_id: str = None, current_period_end: int = None):
+    now = int(time.time())
+    existing = get_premium(guild_id)
+    if existing:
+        _execute(
+            "UPDATE premium_guilds SET "
+            "status=?, "
+            "stripe_customer_id=COALESCE(?, stripe_customer_id), "
+            "stripe_subscription_id=COALESCE(?, stripe_subscription_id), "
+            "current_period_end=COALESCE(?, current_period_end), "
+            "updated_at=? WHERE guild_id=?",
+            (status, stripe_customer_id, stripe_subscription_id, current_period_end, now, guild_id),
+        )
+    else:
+        _execute(
+            "INSERT INTO premium_guilds (guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, now),
+        )
+
+
+def get_premium_by_customer(stripe_customer_id: str):
+    return _fetchone(
+        "SELECT guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at "
+        "FROM premium_guilds WHERE stripe_customer_id=?",
+        (stripe_customer_id,),
+    )
+
+
+def get_premium_by_subscription(stripe_subscription_id: str):
+    return _fetchone(
+        "SELECT guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at "
+        "FROM premium_guilds WHERE stripe_subscription_id=?",
+        (stripe_subscription_id,),
+    )
+
+
+def list_premium_guilds():
+    return _fetchall(
+        "SELECT guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at "
+        "FROM premium_guilds WHERE status='active'"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Comandos personalizados (funcion Premium)
+# ---------------------------------------------------------------------------
+def add_custom_command(guild_id: int, trigger_text: str, response: str) -> int:
+    cur = _execute(
+        "INSERT INTO custom_commands (guild_id, trigger_text, response, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
+        (guild_id, trigger_text.strip().lower(), response, int(time.time())),
+    )
+    return cur.lastrowid
+
+
+def list_custom_commands(guild_id: int):
+    return _fetchall(
+        "SELECT id, trigger_text, response, enabled, created_at FROM custom_commands "
+        "WHERE guild_id=? ORDER BY created_at DESC",
+        (guild_id,),
+    )
+
+
+def count_custom_commands(guild_id: int) -> int:
+    row = _fetchone("SELECT COUNT(*) FROM custom_commands WHERE guild_id=?", (guild_id,))
+    return row[0] if row else 0
+
+
+def get_custom_command(command_id: int, guild_id: int):
+    return _fetchone(
+        "SELECT id, trigger_text, response, enabled, created_at FROM custom_commands WHERE id=? AND guild_id=?",
+        (command_id, guild_id),
+    )
+
+
+def toggle_custom_command(command_id: int, guild_id: int):
+    row = get_custom_command(command_id, guild_id)
+    if row is None:
+        return
+    new_value = 0 if row[3] else 1
+    _execute("UPDATE custom_commands SET enabled=? WHERE id=? AND guild_id=?", (new_value, command_id, guild_id))
+
+
+def delete_custom_command(command_id: int, guild_id: int):
+    _execute("DELETE FROM custom_commands WHERE id=? AND guild_id=?", (command_id, guild_id))
+
+
+# ---------------------------------------------------------------------------
+# Perfil personalizado del bot por servidor (funcion Premium)
+# ---------------------------------------------------------------------------
+def get_bot_profile(guild_id: int):
+    return _fetchone("SELECT guild_id, nickname, updated_at FROM bot_profile WHERE guild_id=?", (guild_id,))
+
+
+def set_bot_profile_nickname(guild_id: int, nickname: str):
+    now = int(time.time())
+    existing = get_bot_profile(guild_id)
+    if existing:
+        _execute("UPDATE bot_profile SET nickname=?, updated_at=? WHERE guild_id=?", (nickname, now, guild_id))
+    else:
+        _execute(
+            "INSERT INTO bot_profile (guild_id, nickname, updated_at) VALUES (?, ?, ?)",
+            (guild_id, nickname, now),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Niveles (XP) por servidor
+# ---------------------------------------------------------------------------
+def get_user_level(guild_id: int, user_id: int):
+    return _fetchone(
+        "SELECT guild_id, user_id, username, xp, level, last_message_at FROM user_levels WHERE guild_id=? AND user_id=?",
+        (guild_id, user_id),
+    )
+
+
+def leaderboard(guild_id: int, limit: int = 10):
+    return _fetchall(
+        "SELECT user_id, username, xp, level FROM user_levels WHERE guild_id=? ORDER BY xp DESC LIMIT ?",
+        (guild_id, limit),
+    )
+
+
+def leaderboard_rank(guild_id: int, user_id: int) -> int:
+    row = _fetchone(
+        "SELECT COUNT(*) + 1 FROM user_levels WHERE guild_id=? AND xp > "
+        "(SELECT xp FROM user_levels WHERE guild_id=? AND user_id=?)",
+        (guild_id, guild_id, user_id),
+    )
+    return row[0] if row else 1
+
+
+# ---------------------------------------------------------------------------
+# Sorteos (giveaways)
+# ---------------------------------------------------------------------------
+def create_giveaway(guild_id: int, channel_id: int, prize: str, winners_count: int, host_id: int, ends_at: int) -> int:
+    cur = _execute(
+        "INSERT INTO giveaways (guild_id, channel_id, prize, winners_count, host_id, ends_at, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (guild_id, channel_id, prize, winners_count, host_id, ends_at, int(time.time())),
+    )
+    return cur.lastrowid
+
+
+def set_giveaway_message_id(giveaway_id: int, message_id: int):
+    _execute("UPDATE giveaways SET message_id=? WHERE id=?", (message_id, giveaway_id))
+
+
+def get_giveaway(giveaway_id: int):
+    return _fetchone(
+        "SELECT id, guild_id, channel_id, message_id, prize, winners_count, host_id, ends_at, ended, winners, created_at "
+        "FROM giveaways WHERE id=?",
+        (giveaway_id,),
+    )
+
+
+def list_giveaways(guild_id: int):
+    return _fetchall(
+        "SELECT id, guild_id, channel_id, message_id, prize, winners_count, host_id, ends_at, ended, winners, created_at "
+        "FROM giveaways WHERE guild_id=? ORDER BY created_at DESC",
+        (guild_id,),
+    )
+
+
+def list_due_giveaways():
+    now = int(time.time())
+    return _fetchall(
+        "SELECT id, guild_id, channel_id, message_id, prize, winners_count, host_id, ends_at, ended, winners, created_at "
+        "FROM giveaways WHERE ended=0 AND ends_at<=?",
+        (now,),
+    )
+
+
+def finish_giveaway(giveaway_id: int, winners_ids: list):
+    _execute(
+        "UPDATE giveaways SET ended=1, winners=? WHERE id=?",
+        (",".join(str(w) for w in winners_ids), giveaway_id),
+    )
+
+
+def add_giveaway_entry(giveaway_id: int, user_id: int):
+    _execute(
+        "INSERT OR IGNORE INTO giveaway_entries (giveaway_id, user_id, created_at) VALUES (?, ?, ?)",
+        (giveaway_id, user_id, int(time.time())),
+    )
+
+
+def has_giveaway_entry(giveaway_id: int, user_id: int) -> bool:
+    row = _fetchone("SELECT 1 FROM giveaway_entries WHERE giveaway_id=? AND user_id=?", (giveaway_id, user_id))
+    return row is not None
+
+
+def list_giveaway_entries(giveaway_id: int):
+    return [r[0] for r in _fetchall("SELECT user_id FROM giveaway_entries WHERE giveaway_id=?", (giveaway_id,))]
+
+
+def count_giveaway_entries(giveaway_id: int) -> int:
+    row = _fetchone("SELECT COUNT(*) FROM giveaway_entries WHERE giveaway_id=?", (giveaway_id,))
+    return row[0] if row else 0
+
+
+# ---------------------------------------------------------------------------
+# Tickets
+# ---------------------------------------------------------------------------
+def create_ticket(guild_id: int, user_id: int) -> int:
+    cur = _execute(
+        "INSERT INTO tickets (guild_id, user_id, status, created_at) VALUES (?, ?, 'open', ?)",
+        (guild_id, user_id, int(time.time())),
+    )
+    return cur.lastrowid
+
+
+def set_ticket_channel(ticket_id: int, channel_id: int):
+    _execute("UPDATE tickets SET channel_id=? WHERE id=?", (channel_id, ticket_id))
+
+
+def get_ticket(ticket_id: int):
+    return _fetchone(
+        "SELECT id, guild_id, channel_id, user_id, status, created_at, closed_at FROM tickets WHERE id=?",
+        (ticket_id,),
+    )
+
+
+def get_open_ticket_for_user(guild_id: int, user_id: int):
+    return _fetchone(
+        "SELECT id, guild_id, channel_id, user_id, status, created_at, closed_at FROM tickets "
+        "WHERE guild_id=? AND user_id=? AND status='open'",
+        (guild_id, user_id),
+    )
+
+
+def close_ticket(ticket_id: int):
+    _execute("UPDATE tickets SET status='closed', closed_at=? WHERE id=?", (int(time.time()), ticket_id))
+
+
+def list_tickets(guild_id: int, status: str = None):
+    if status:
+        return _fetchall(
+            "SELECT id, guild_id, channel_id, user_id, status, created_at, closed_at FROM tickets "
+            "WHERE guild_id=? AND status=? ORDER BY created_at DESC",
+            (guild_id, status),
+        )
+    return _fetchall(
+        "SELECT id, guild_id, channel_id, user_id, status, created_at, closed_at FROM tickets "
+        "WHERE guild_id=? ORDER BY created_at DESC",
+        (guild_id,),
+    )
+
+
+def tickets_open_count(guild_id: int) -> int:
+    row = _fetchone("SELECT COUNT(*) FROM tickets WHERE guild_id=? AND status='open'", (guild_id,))
+    return row[0] if row else 0
+
+
+# ---------------------------------------------------------------------------
+# Roles de reaccion / boton
+# ---------------------------------------------------------------------------
+def create_reaction_panel(guild_id: int, channel_id: int, title: str, description: str) -> int:
+    cur = _execute(
+        "INSERT INTO reaction_role_panels (guild_id, channel_id, title, description, created_at) VALUES (?, ?, ?, ?, ?)",
+        (guild_id, channel_id, title, description, int(time.time())),
+    )
+    return cur.lastrowid
+
+
+def set_reaction_panel_message(panel_id: int, message_id: int):
+    _execute("UPDATE reaction_role_panels SET message_id=? WHERE id=?", (message_id, panel_id))
+
+
+def get_reaction_panel(panel_id: int):
+    return _fetchone(
+        "SELECT id, guild_id, channel_id, message_id, title, description, created_at FROM reaction_role_panels WHERE id=?",
+        (panel_id,),
+    )
+
+
+def list_reaction_panels(guild_id: int):
+    return _fetchall(
+        "SELECT id, guild_id, channel_id, message_id, title, description, created_at FROM reaction_role_panels "
+        "WHERE guild_id=? ORDER BY created_at DESC",
+        (guild_id,),
+    )
+
+
+def delete_reaction_panel(panel_id: int, guild_id: int):
+    _execute("DELETE FROM reaction_role_options WHERE panel_id=?", (panel_id,))
+    _execute("DELETE FROM reaction_role_panels WHERE id=? AND guild_id=?", (panel_id, guild_id))
+
+
+def add_reaction_option(panel_id: int, role_id: int, label: str, emoji: str = "") -> int:
+    cur = _execute(
+        "INSERT INTO reaction_role_options (panel_id, role_id, label, emoji) VALUES (?, ?, ?, ?)",
+        (panel_id, role_id, label, emoji),
+    )
+    return cur.lastrowid
+
+
+def list_reaction_options(panel_id: int):
+    return _fetchall(
+        "SELECT id, panel_id, role_id, label, emoji FROM reaction_role_options WHERE panel_id=?",
+        (panel_id,),
+    )
+
+
+def delete_reaction_option(option_id: int):
+    _execute("DELETE FROM reaction_role_options WHERE id=?", (option_id,))

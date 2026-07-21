@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+<div class="grid md:grid-cols-2 gap-4 mb-6">
+  <div class="card">
+    <div class="font-bold text-white mb-3">⚙️ Configuración</div>
+    <form method="post" action="{{ url_for('tickets_config_save', guild_id=guild_id) }}" class="space-y-3">
+      <div>
+        <label class="field-label">Categoría donde se crean los tickets</label>
+        <select name="category_id">
+          <option value="">Sin categoría (raíz del servidor)</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" {{ "selected" if tickets_cfg.category_id == c.id|string }}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Rol de staff que ve todos los tickets</label>
+        <select name="staff_role_id">
+          <option value="">Ninguno</option>
+          {% for r in roles %}
+            <option value="{{ r.id }}" {{ "selected" if tickets_cfg.staff_role_id == r.id|string }}>@{{ r.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-primary">Guardar</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="font-bold text-white mb-3">📌 Publicar panel de tickets</div>
+    <p class="text-sm text-slate-400 mb-3">Publica el mensaje con el botón "Abrir ticket" en el canal que elijas.</p>
+    <form method="post" action="{{ url_for('tickets_publicar', guild_id=guild_id) }}" class="flex gap-2">
+      <select name="channel_id">
+        {% for c in text_channels %}
+          <option value="{{ c.id }}">#{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-primary shrink-0">Publicar</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="font-bold text-white mb-3">🎫 Tickets</div>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-slate-400">
+        <th class="py-2">ID</th>
+        <th>Usuario</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tid, tguild, channel_id, user_id, status, created_at, closed_at in tickets_list %}
+      <tr class="border-t border-white/5">
+        <td class="py-2">#{{ tid }}</td>
+        <td>{{ user_id }}</td>
+        <td><span class="pill {{ 'pill-on' if status == 'open' else 'pill-off' }}">{{ 'Abierto' if status == 'open' else 'Cerrado' }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="py-4 text-center text-slate-400">Todavía no se ha abierto ningún ticket.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

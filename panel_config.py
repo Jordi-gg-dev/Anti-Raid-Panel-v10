@@ -32,4 +32,17 @@ DB_PATH: str = os.getenv("DB_PATH") or os.path.join(
 
 PANEL_PORT: int = int(os.getenv("PORT") or os.getenv("PANEL_PORT", "5000"))
 
+# --- Stripe (suscripciones Premium por servidor) ---
+STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_ID: str = os.getenv("STRIPE_PRICE_ID", "")
+
+# URL publica del panel (para construir los enlaces de vuelta de Stripe Checkout).
+# En Railway, pon aqui el dominio que te genere (ej: https://tu-panel.up.railway.app)
+PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:5000")
+
 BOT_NAME = "AstroCube Anti-Raid"
+
+# Enlace de invitación a tu servidor de Discord de soporte/comunidad, para el
+# botón "Únete a mi Servidor" del panel. Sobreescribible desde el .env.
+SUPPORT_SERVER_INVITE: str = os.getenv("SUPPORT_SERVER_INVITE", "https://discord.gg/jRdnjBqVK")

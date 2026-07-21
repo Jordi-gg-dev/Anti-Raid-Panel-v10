@@ -126,6 +126,47 @@ def create_role(token: str, guild_id: int, name: str, color: int = 0, hoist: boo
     return resp.json()
 
 
+def set_bot_nickname(token: str, guild_id: int, nickname: str) -> dict:
+    """Cambia el apodo del bot en ESE servidor concreto (PATCH @me).
+    Nota: Discord no permite que un mismo bot tenga un avatar distinto por
+    servidor, solo el apodo/nickname se puede personalizar por servidor."""
+    payload = {"nick": nickname or None}
+    resp = _request("PATCH", f"{API_BASE}/guilds/{guild_id}/members/@me", headers=_headers(token), json=payload)
+    if resp.status_code not in (200, 204):
+        raise DiscordAPIError(f"No se pudo cambiar el apodo del bot ({resp.status_code}: {resp.text[:200]})")
+    return resp.json() if resp.text else {}
+
+
+def send_message_with_buttons(token: str, channel_id: int, title: str, description: str, buttons: list, color_hex: str = "5865F2") -> dict:
+    """Publica un embed con botones (roles de reaccion, etc.) usando la API
+    REST directamente. 'buttons' es una lista de dicts: {"label", "custom_id", "emoji" (opcional)}.
+    Se agrupan en filas de hasta 5 botones (limite de Discord por fila)."""
+    try:
+        color_int = int(color_hex.lstrip("#"), 16)
+    except ValueError:
+        color_int = 0x5865F2
+
+    rows = []
+    for i in range(0, len(buttons), 5):
+        chunk = buttons[i:i + 5]
+        components = []
+        for b in chunk:
+            comp = {"type": 2, "style": 1, "label": b["label"][:80], "custom_id": b["custom_id"]}
+            if b.get("emoji"):
+                comp["emoji"] = {"name": b["emoji"]}
+            components.append(comp)
+        rows.append({"type": 1, "components": components})
+
+    payload = {
+        "embeds": [{"title": title, "description": description, "color": color_int}],
+        "components": rows,
+    }
+    resp = _request("POST", f"{API_BASE}/channels/{channel_id}/messages", headers=_headers(token), json=payload)
+    if resp.status_code not in (200, 201):
+        raise DiscordAPIError(f"No se pudo publicar el panel ({resp.status_code}: {resp.text[:200]})")
+    return resp.json()
+
+
 def leave_guild(token: str, guild_id: int) -> None:
     resp = _request("DELETE", f"{API_BASE}/users/@me/guilds/{guild_id}", headers=_headers(token))
     if resp.status_code not in (200, 204):

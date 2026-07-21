@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "_page_header.html" %}
+
+{% if checkout_result == "success" %}
+<div class="card mb-6 !border-emerald-500/40 !bg-emerald-500/10">
+  <div class="font-bold text-emerald-400">✅ ¡Pago completado!</div>
+  <div class="text-sm text-slate-300 mt-1">Puede tardar unos segundos en activarse mientras Stripe confirma la suscripción. Recarga esta página si no ves el estado "Activo" todavía.</div>
+</div>
+{% elif checkout_result == "cancel" %}
+<div class="card mb-6 !border-amber-500/40 !bg-amber-500/10">
+  <div class="font-bold text-amber-400">Pago cancelado</div>
+  <div class="text-sm text-slate-300 mt-1">No se ha completado ningún cargo. Puedes volver a intentarlo cuando quieras.</div>
+</div>
+{% endif %}
+
+{% if not stripe_configured %}
+<div class="card mb-6 !border-red-500/40 !bg-red-500/10">
+  <div class="font-bold text-red-400">Stripe no está configurado</div>
+  <div class="text-sm text-slate-300 mt-1">
+    Falta STRIPE_SECRET_KEY y/o STRIPE_PRICE_ID en las variables de entorno del panel.
+    Crea un producto recurrente en tu Dashboard de Stripe, copia el Price ID, y añade tus claves
+    para poder activar los pagos.
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-6">
+  <div class="flex items-center justify-between flex-wrap gap-4">
+    <div>
+      <div class="text-xs font-bold uppercase tracking-wide text-amber-400 mb-1">Estado de la suscripción</div>
+      {% if is_premium %}
+        <div class="text-2xl font-extrabold text-white">💎 Premium activo</div>
+        {% if premium and premium[4] %}
+          <div class="text-sm text-slate-400 mt-1">Próxima renovación: <span class="text-slate-200 font-semibold">{{ premium[4] }}</span> (timestamp Unix)</div>
+        {% endif %}
+      {% else %}
+        <div class="text-2xl font-extrabold text-white">Plan gratuito</div>
+        <div class="text-sm text-slate-400 mt-1">Este servidor todavía no tiene Premium.</div>
+      {% endif %}
+    </div>
+
+    <div class="flex gap-2">
+      {% if is_premium %}
+        <form method="post" action="{{ url_for('premium_portal', guild_id=guild_id) }}">
+          <button type="submit" class="btn-ghost">Gestionar suscripción</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('premium_checkout', guild_id=guild_id) }}">
+          <button type="submit" class="btn-primary" {{ "disabled" if not stripe_configured }}>💎 Suscribirse a Premium</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-4">
+  <div class="card">
+    <div class="text-2xl mb-2">🖥️</div>
+    <div class="font-bold text-white mb-1">Comandos personalizados</div>
+    <div class="text-sm text-slate-400">Crea tus propios comandos con prefijo (ej. <code>!reglas</code>) sin tocar código.</div>
+  </div>
+  <div class="card">
+    <div class="text-2xl mb-2">🎭</div>
+    <div class="font-bold text-white mb-1">Perfil de bot personalizado</div>
+    <div class="text-sm text-slate-400">Cambia el apodo del bot dentro de tu servidor.</div>
+  </div>
+  <div class="card">
+    <div class="text-2xl mb-2">⭐</div>
+    <div class="font-bold text-white mb-1">Más funciones en camino</div>
+    <div class="text-sm text-slate-400">Tickets, sorteos, formularios y niveles llegarán en próximas actualizaciones.</div>
+  </div>
+</div>
+{% endblock %}
