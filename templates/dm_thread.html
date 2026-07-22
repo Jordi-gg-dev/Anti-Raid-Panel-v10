@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6 flex items-center gap-3">
+  <img src="{{ thread_avatar or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-12 h-12 rounded-full">
+  <div>
+    <div class="text-xs text-slate-500 font-semibold mb-0.5"><a href="{{ url_for('dm_inbox') }}" class="hover:text-white">← Mensajes privados</a></div>
+    <h1 class="text-xl font-extrabold text-white">{{ thread_username }}</h1>
+    <div class="text-xs text-slate-500">ID: {{ thread_user_id }}</div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="space-y-3 max-h-[60vh] overflow-y-auto" id="dm-scroll">
+    {% for e in entries %}
+    <div class="flex {{ 'justify-end' if e.direction == 'out' else 'justify-start' }}">
+      <div class="max-w-[75%] rounded-xl px-3 py-2 {{ 'bg-orange-600/20 border border-orange-600/30' if e.direction == 'out' else 'bg-black/30 border border-white/5' }}">
+        <div class="text-sm text-slate-100 whitespace-pre-wrap break-words">{{ e.content }}</div>
+        <div class="text-[10px] text-slate-500 mt-1 epoch-cell" data-ts="{{ e.created_at }}">
+          {% if e.direction == 'out' %}{{ e.responded_by_username or 'Equipo' }} · {% endif %}—
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <form method="post" action="{{ url_for('dm_reply', user_id=thread_user_id) }}" class="flex gap-2">
+    <input type="text" name="content" placeholder="Escribe una respuesta…" required class="flex-1" autocomplete="off">
+    <button type="submit" class="btn-primary whitespace-nowrap">Enviar</button>
+  </form>
+  <p class="text-[11px] text-slate-500 mt-2">Se envía como un DM normal desde el bot. Si la persona tiene los mensajes directos cerrados, el envío fallará y te avisaremos aquí.</p>
+</div>
+
+<script>
+  document.querySelectorAll(".epoch-cell").forEach(el => {
+    const ts = parseInt(el.dataset.ts, 10);
+    const label = new Date(ts * 1000).toLocaleString();
+    el.textContent = el.textContent.replace("—", label);
+  });
+  const scrollBox = document.getElementById("dm-scroll");
+  if (scrollBox) scrollBox.scrollTop = scrollBox.scrollHeight;
+</script>
+{% endblock %}

@@ -87,6 +87,14 @@
           {% endfor %}
         {% else %}
           <a href="{{ url_for('dashboard') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'dashboard' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('grid') }} Servidores</a>
+          {% if is_panel_mod %}
+          <a href="{{ url_for('dm_inbox') }}" class="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint in ('dm_inbox', 'dm_thread') %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">
+            <span class="flex items-center gap-2.5">{{ icons.icon('message-square') }} Mensajes privados</span>
+            {% if unread_dm_threads %}
+              <span class="text-[10px] font-bold {% if request.endpoint in ('dm_inbox', 'dm_thread') %}bg-black/25 text-black{% else %}bg-orange-500/20 text-orange-300{% endif %} rounded-full px-1.5 py-0.5">{{ unread_dm_threads }}</span>
+            {% endif %}
+          </a>
+          {% endif %}
           {% if is_owner %}
           <a href="{{ url_for('activity_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'activity_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('activity') }} Actividad</a>
           <a href="{{ url_for('global_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'global_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('globe') }} Global</a>

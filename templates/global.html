@@ -75,6 +75,34 @@
   </div>
 </div>
 
+<div class="card mb-6">
+  <div class="font-bold text-white mb-1">🛡️ Moderadores del panel</div>
+  <p class="text-xs text-slate-400 mb-4">Dales acceso a personas de tu confianza a funciones concretas del panel sin hacerlas propietarias (por ahora: la bandeja de Mensajes privados). Tú siempre tienes acceso a todo.</p>
+  <form method="post" action="{{ url_for('global_mod_add') }}" class="flex flex-col sm:flex-row gap-2 mb-4">
+    <input type="text" name="user_id" placeholder="ID de usuario" required class="flex-1">
+    <button type="submit" class="btn-primary whitespace-nowrap">➕ Dar acceso de moderador</button>
+  </form>
+  <div class="space-y-2">
+    {% for mod in panel_moderators %}
+    <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <img src="{{ mod.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-8 h-8 rounded-full">
+        <div class="min-w-0">
+          <div class="text-sm text-slate-200 font-semibold truncate">{{ mod.username or mod.user_id }}</div>
+          <div class="text-xs text-slate-500">ID: <code>{{ mod.user_id }}</code></div>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('global_mod_remove') }}">
+        <input type="hidden" name="user_id" value="{{ mod.user_id }}">
+        <button type="submit" class="text-xs text-red-400 hover:text-red-300 font-semibold shrink-0">Quitar</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="text-xs text-slate-500">Todavía no has dado acceso de moderador a nadie.</div>
+    {% endfor %}
+  </div>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="card">
     <div class="font-bold text-white mb-1">🚫 Servidores bloqueados</div>

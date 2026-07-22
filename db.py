@@ -180,6 +180,27 @@ _conn.executescript(
         avatar_url TEXT,
         added_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS panel_moderators (
+        user_id INTEGER PRIMARY KEY,
+        username TEXT,
+        avatar_url TEXT,
+        added_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS dm_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        username TEXT,
+        avatar_url TEXT,
+        direction TEXT NOT NULL,
+        content TEXT NOT NULL,
+        responded_by INTEGER,
+        responded_by_username TEXT,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS dm_read_state (
+        user_id INTEGER PRIMARY KEY,
+        last_read_at INTEGER NOT NULL
+    );
     """
 )
 _conn.commit()
@@ -566,6 +587,108 @@ def remove_staff_member(user_id: int) -> None:
 def list_staff_members():
     return _fetchall(
         "SELECT user_id, rank, username, avatar_url, added_at FROM staff_members ORDER BY added_at ASC"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Moderadores del panel (acceso concedido por el dueño a funciones concretas,
+# empezando por la bandeja de mensajes privados).
+# ---------------------------------------------------------------------------
+def add_panel_moderator(user_id: int, username: str | None = None, avatar_url: str | None = None) -> None:
+    _execute(
+        "INSERT INTO panel_moderators (user_id, username, avatar_url, added_at) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET "
+        "username=COALESCE(excluded.username, panel_moderators.username), "
+        "avatar_url=COALESCE(excluded.avatar_url, panel_moderators.avatar_url)",
+        (user_id, username, avatar_url, int(time.time())),
+    )
+
+
+def remove_panel_moderator(user_id: int) -> None:
+    _execute("DELETE FROM panel_moderators WHERE user_id = ?", (user_id,))
+
+
+def is_panel_moderator(user_id: int) -> bool:
+    row = _fetchone("SELECT 1 FROM panel_moderators WHERE user_id = ?", (user_id,))
+    return row is not None
+
+
+def list_panel_moderators():
+    return _fetchall(
+        "SELECT user_id, username, avatar_url, added_at FROM panel_moderators ORDER BY added_at ASC"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Mensajes privados (modmail)
+# ---------------------------------------------------------------------------
+def log_dm_message(
+    user_id: int, username: str | None, avatar_url: str | None, direction: str, content: str,
+    responded_by: int | None = None, responded_by_username: str | None = None,
+) -> None:
+    _execute(
+        "INSERT INTO dm_messages (user_id, username, avatar_url, direction, content, responded_by, "
+        "responded_by_username, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, username, avatar_url, direction, content, responded_by, responded_by_username, int(time.time())),
+    )
+
+
+def list_dm_threads():
+    """Un hilo por usuario (el último mensaje, entrante o saliente), con
+    contador de mensajes entrantes no leídos, ordenado por actividad reciente."""
+    rows = _fetchall(
+        "SELECT dm.user_id, dm.username, dm.avatar_url, dm.content, dm.direction, dm.created_at "
+        "FROM dm_messages dm "
+        "INNER JOIN (SELECT user_id, MAX(id) AS max_id FROM dm_messages GROUP BY user_id) latest "
+        "ON dm.user_id = latest.user_id AND dm.id = latest.max_id "
+        "ORDER BY dm.created_at DESC"
+    )
+    threads = []
+    for user_id, username, avatar_url, content, direction, created_at in rows:
+        threads.append({
+            "user_id": user_id, "username": username, "avatar_url": avatar_url,
+            "last_content": content, "last_direction": direction, "last_created_at": created_at,
+            "unread": _count_unread_in_thread(user_id),
+        })
+    return threads
+
+
+def _count_unread_in_thread(user_id: int) -> int:
+    row = _fetchone(
+        "SELECT COUNT(*) FROM dm_messages "
+        "WHERE user_id = ? AND direction = 'in' AND created_at > COALESCE("
+        "  (SELECT last_read_at FROM dm_read_state WHERE user_id = ?), 0)",
+        (user_id, user_id),
+    )
+    return row[0] if row else 0
+
+
+def count_unread_dm_threads() -> int:
+    row = _fetchone(
+        "SELECT COUNT(*) FROM ("
+        "  SELECT dm.user_id FROM dm_messages dm "
+        "  LEFT JOIN dm_read_state rs ON rs.user_id = dm.user_id "
+        "  WHERE dm.direction = 'in' AND dm.created_at > COALESCE(rs.last_read_at, 0) "
+        "  GROUP BY dm.user_id"
+        ")"
+    )
+    return row[0] if row else 0
+
+
+def list_dm_messages(user_id: int, limit: int = 300):
+    return _fetchall(
+        "SELECT id, user_id, username, avatar_url, direction, content, responded_by, "
+        "responded_by_username, created_at FROM dm_messages WHERE user_id = ? "
+        "ORDER BY created_at ASC LIMIT ?",
+        (user_id, limit),
+    )
+
+
+def mark_dm_thread_read(user_id: int) -> None:
+    _execute(
+        "INSERT INTO dm_read_state (user_id, last_read_at) VALUES (?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET last_read_at=excluded.last_read_at",
+        (user_id, int(time.time())),
     )
 
 

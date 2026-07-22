@@ -85,6 +85,19 @@ def owner_required(view):
     return wrapped
 
 
+def panel_mod_or_owner_required(view):
+    """Para funciones que el dueño quiere delegar (p. ej. la bandeja de
+    mensajes privados) a personas de confianza sin darles acceso de dueño
+    completo (Global, Código, etc.)."""
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        user_id = session.get("user_id")
+        if not _is_owner(user_id) and not db.is_panel_moderator(user_id):
+            return render_template("denied.html", user=session.get("username"), reason="owner")
+        return view(*args, **kwargs)
+    return wrapped
+
+
 def _user_can_manage_guild(user_id: int, guild_id: int) -> bool:
     """True si el usuario es el propietario del bot, o si tiene permiso de
     Administrador/Gestionar Servidor (o es el dueño) en ESE servidor concreto."""
@@ -139,6 +152,10 @@ def inject_globals():
         {"user_id": user_id, "rank": rank, "username": username, "avatar_url": avatar_url}
         for user_id, rank, username, avatar_url, added_at in db.list_staff_members()
     ]
+    user_id = session.get("user_id")
+    is_owner_now = _is_owner(user_id) if user_id else False
+    is_panel_mod_now = is_owner_now or (bool(user_id) and db.is_panel_moderator(user_id))
+    unread_dm_threads = db.count_unread_dm_threads() if is_panel_mod_now else 0
     return {
         "bot_name": config.BOT_NAME,
         "session_user": session.get("username"),
@@ -147,10 +164,12 @@ def inject_globals():
         "tab_label": _tab_label,
         "custom_css": custom.get("custom_css", ""),
         "custom_js": custom.get("custom_js", ""),
-        "is_owner": _is_owner(session.get("user_id")) if "user_id" in session else False,
+        "is_owner": is_owner_now,
+        "is_panel_mod": is_panel_mod_now,
         "support_server_invite": config.SUPPORT_SERVER_INVITE,
         "staff_list": staff_list,
         "staff_ranks": STAFF_RANKS,
+        "unread_dm_threads": unread_dm_threads,
     }
 
 
@@ -265,6 +284,28 @@ def dashboard():
     )
 
 
+@app.route("/dashboard/buscar", methods=["POST"])
+@login_required
+def dashboard_buscar_servidor():
+    guild_id_raw = request.form.get("guild_id", "").strip()
+    if not guild_id_raw or not guild_id_raw.isdigit():
+        flash("Indica un ID de servidor válido (solo números).", "error")
+        return redirect(url_for("dashboard"))
+
+    guild_id = int(guild_id_raw)
+    try:
+        api.get_guild(config.BOT_TOKEN, guild_id)
+    except api.DiscordAPIError:
+        flash("El bot no está en ningún servidor con ese ID (o el ID no es correcto).", "error")
+        return redirect(url_for("dashboard"))
+
+    if not _user_can_manage_guild(session.get("user_id"), guild_id):
+        flash("El bot sí está en ese servidor, pero no tienes permisos de Administrador o Gestionar Servidor ahí.", "error")
+        return redirect(url_for("dashboard"))
+
+    return redirect(url_for("guild_detail", guild_id=guild_id))
+
+
 @app.route("/tienda")
 @login_required
 def tienda_page():
@@ -283,6 +324,65 @@ def tienda_page():
     return render_template("tienda.html", guilds=guilds, perks=perks)
 
 
+@app.route("/mensajes")
+@login_required
+@panel_mod_or_owner_required
+def dm_inbox():
+    threads = db.list_dm_threads()
+    return render_template("dm_inbox.html", threads=threads)
+
+
+@app.route("/mensajes/<int:user_id>")
+@login_required
+@panel_mod_or_owner_required
+def dm_thread(user_id):
+    messages = db.list_dm_messages(user_id)
+    if not messages:
+        flash("No hay ningún hilo de mensajes con ese usuario.", "error")
+        return redirect(url_for("dm_inbox"))
+    db.mark_dm_thread_read(user_id)
+
+    entries = [
+        {
+            "id": m[0], "user_id": m[1], "username": m[2], "avatar_url": m[3],
+            "direction": m[4], "content": m[5], "responded_by": m[6],
+            "responded_by_username": m[7], "created_at": m[8],
+        }
+        for m in messages
+    ]
+    thread_username = entries[-1]["username"] or str(user_id)
+    thread_avatar = next((e["avatar_url"] for e in reversed(entries) if e["direction"] == "in" and e["avatar_url"]), None)
+
+    return render_template(
+        "dm_thread.html", entries=entries, thread_user_id=user_id,
+        thread_username=thread_username, thread_avatar=thread_avatar,
+    )
+
+
+@app.route("/mensajes/<int:user_id>/responder", methods=["POST"])
+@login_required
+@panel_mod_or_owner_required
+def dm_reply(user_id):
+    content = request.form.get("content", "").strip()
+    if not content:
+        flash("Escribe algo antes de enviar.", "error")
+        return redirect(url_for("dm_thread", user_id=user_id))
+
+    try:
+        api.send_dm_text(config.BOT_TOKEN, user_id, content)
+    except api.DiscordAPIError as exc:
+        flash(f"No se pudo enviar el mensaje: {exc}", "error")
+        return redirect(url_for("dm_thread", user_id=user_id))
+
+    db.log_dm_message(
+        user_id, None, None, "out", content,
+        responded_by=session.get("user_id"), responded_by_username=session.get("username"),
+    )
+    db.mark_dm_thread_read(user_id)
+    flash("Mensaje enviado.", "success")
+    return redirect(url_for("dm_thread", user_id=user_id))
+
+
 @app.route("/global", methods=["GET"])
 @login_required
 @owner_required
@@ -297,9 +397,15 @@ def global_page():
     except api.DiscordAPIError:
         guild_names = {}
 
+    panel_moderators = [
+        {"user_id": user_id, "username": username, "avatar_url": avatar_url}
+        for user_id, username, avatar_url, added_at in db.list_panel_moderators()
+    ]
+
     return render_template(
         "global.html", guild_blacklist=guild_blacklist, user_blacklist=user_blacklist,
         premium_guilds=premium_guilds, guild_names=guild_names,
+        panel_moderators=panel_moderators,
     )
 
 
@@ -367,6 +473,43 @@ def global_staff_remove():
         return redirect(url_for("global_page"))
     db.remove_staff_member(int(user_id))
     flash("Miembro del Staff eliminado.", "success")
+    return redirect(url_for("global_page"))
+
+
+@app.route("/global/moderadores/add", methods=["POST"])
+@login_required
+@owner_required
+def global_mod_add():
+    user_id = request.form.get("user_id", "").strip()
+    if not user_id or not user_id.isdigit():
+        flash("Indica un ID de usuario válido.", "error")
+        return redirect(url_for("global_page"))
+
+    username, avatar_url = None, None
+    try:
+        user = api.get_user(config.BOT_TOKEN, int(user_id))
+        if user:
+            discriminator = user.get("discriminator", "0")
+            username = user["username"] if discriminator == "0" else f"{user['username']}#{discriminator}"
+            avatar_url = api.user_avatar_url(user)
+    except api.DiscordAPIError:
+        pass
+
+    db.add_panel_moderator(int(user_id), username=username, avatar_url=avatar_url)
+    flash(f"{username or user_id} ahora tiene acceso de moderador al panel (bandeja de mensajes privados).", "success")
+    return redirect(url_for("global_page"))
+
+
+@app.route("/global/moderadores/remove", methods=["POST"])
+@login_required
+@owner_required
+def global_mod_remove():
+    user_id = request.form.get("user_id", "").strip()
+    if not user_id or not user_id.isdigit():
+        flash("Falta el ID del usuario.", "error")
+        return redirect(url_for("global_page"))
+    db.remove_panel_moderator(int(user_id))
+    flash("Acceso de moderador retirado.", "success")
     return redirect(url_for("global_page"))
 
 

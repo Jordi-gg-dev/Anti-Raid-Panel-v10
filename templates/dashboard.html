@@ -53,6 +53,15 @@
   </div>
 </div>
 
+<div class="card mb-6">
+  <div class="font-bold text-white mb-1">🔎 Gestionar un servidor por ID</div>
+  <p class="text-xs text-slate-400 mb-3">Si el bot está en un servidor que no ves en la lista de abajo (por ejemplo, uno donde también eres administrador), busca su ID aquí para entrar directamente.</p>
+  <form method="post" action="{{ url_for('dashboard_buscar_servidor') }}" class="flex flex-col sm:flex-row gap-2">
+    <input type="text" name="guild_id" placeholder="ID del servidor" required class="flex-1">
+    <button type="submit" class="btn-primary whitespace-nowrap">Buscar y gestionar</button>
+  </form>
+</div>
+
 {% if not guilds %}
   <div class="card text-center text-slate-400">
     {% if is_filtered_view %}

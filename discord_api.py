@@ -164,6 +164,20 @@ def send_dm(token: str, user_id: int, title: str, description: str, fields: list
     return send_embed_rich(token, dm_channel["id"], title, description, fields=fields, color_hex=color_hex, footer=footer)
 
 
+def send_dm_text(token: str, user_id: int, content: str) -> dict:
+    """Abre un MD con el usuario y le envía un mensaje de texto normal (sin
+    embed), pensado para respuestas de la bandeja de mensajes privados donde
+    se quiere que se vea como una conversación normal."""
+    dm_channel = create_dm_channel(token, user_id)
+    resp = _request(
+        "POST", f"{API_BASE}/channels/{dm_channel['id']}/messages",
+        headers=_headers(token), json={"content": content},
+    )
+    if resp.status_code not in (200, 201):
+        raise DiscordAPIError(f"No se pudo enviar el mensaje privado ({resp.status_code})")
+    return resp.json()
+
+
 def create_channel(token: str, guild_id: int, name: str, channel_type: int = 0, parent_id: int | None = None) -> dict:
     payload = {"name": name, "type": channel_type}
     if parent_id:

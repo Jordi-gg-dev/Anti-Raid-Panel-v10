@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="text-xs text-slate-500 font-semibold mb-1">Panel de AstroCube</div>
+  <h1 class="text-2xl font-extrabold text-white">💬 Mensajes privados</h1>
+  <p class="text-sm text-slate-400 mt-1">Conversaciones por DM con el bot. Solo la ves tú y las personas con acceso de moderador.</p>
+</div>
+
+<div class="card !p-0 overflow-hidden">
+  {% if threads %}
+  <div class="divide-y divide-white/5">
+    {% for t in threads %}
+    <a href="{{ url_for('dm_thread', user_id=t.user_id) }}" class="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition">
+      <img src="{{ t.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-10 h-10 rounded-full shrink-0">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold text-white truncate">{{ t.username or t.user_id }}</span>
+          {% if t.unread %}
+          <span class="text-[10px] font-bold bg-orange-500 text-black rounded-full px-1.5 py-0.5 shrink-0">{{ t.unread }}</span>
+          {% endif %}
+        </div>
+        <div class="text-xs text-slate-500 truncate">
+          {% if t.last_direction == 'out' %}<span class="text-slate-600">Tú: </span>{% endif %}{{ t.last_content }}
+        </div>
+      </div>
+      <div class="text-[11px] text-slate-500 epoch-cell shrink-0" data-ts="{{ t.last_created_at }}">—</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center text-slate-400 py-12">Todavía no ha escrito nadie al bot por privado.</div>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll(".epoch-cell").forEach(el => {
+    const d = new Date(parseInt(el.dataset.ts, 10) * 1000);
+    el.textContent = d.toLocaleString();
+  });
+</script>
+{% endblock %}
