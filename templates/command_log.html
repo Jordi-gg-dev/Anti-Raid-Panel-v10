@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="text-xs text-slate-500 font-semibold mb-1">Panel de AstroCube</div>
+  <h1 class="text-2xl font-extrabold text-white">🧾 Registro de comandos</h1>
+  <p class="text-sm text-slate-400 mt-1">Todos los comandos usados con el bot, en cualquier servidor: quién los usó, su ID, en qué servidor y cuándo. Solo visible para ti.</p>
+</div>
+
+<div class="card mb-6">
+  <form method="get" class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+    <input type="text" name="guild_id" placeholder="ID de servidor" value="{{ filtro_guild }}">
+    <input type="text" name="user_id" placeholder="ID de usuario" value="{{ filtro_user }}">
+    <input type="text" name="comando" placeholder="Nombre del comando (ej. purge)" value="{{ filtro_comando }}">
+    <div class="flex gap-2">
+      <button type="submit" class="btn-primary flex-1">Filtrar</button>
+      <a href="{{ url_for('command_log_page') }}" class="btn-ghost flex items-center justify-center px-3">Limpiar</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="font-bold text-white mb-3">Últimos {{ entries|length }} usos registrados</div>
+  {% if entries %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="text-left text-slate-500 border-b border-white/5">
+          <th class="py-2 pr-4">Fecha</th>
+          <th class="py-2 pr-4">Comando</th>
+          <th class="py-2 pr-4">Usuario</th>
+          <th class="py-2 pr-4">ID usuario</th>
+          <th class="py-2 pr-4">Servidor</th>
+          <th class="py-2 pr-4">ID servidor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr class="border-b border-white/5">
+          <td class="py-2 pr-4 text-slate-400 epoch-cell" data-ts="{{ e.created_at }}">—</td>
+          <td class="py-2 pr-4"><code class="text-orange-300">/{{ e.command_name }}</code></td>
+          <td class="py-2 pr-4 text-slate-200">{{ e.username or "Desconocido" }}</td>
+          <td class="py-2 pr-4"><code class="text-slate-500">{{ e.user_id }}</code></td>
+          <td class="py-2 pr-4 text-slate-200">{{ e.guild_name or "—" }}</td>
+          <td class="py-2 pr-4"><code class="text-slate-500">{{ e.guild_id or "DM" }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-slate-400 py-8">Todavía no hay comandos registrados con esos filtros.</div>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll(".epoch-cell").forEach(el => {
+    const d = new Date(parseInt(el.dataset.ts, 10) * 1000);
+    el.textContent = d.toLocaleString();
+  });
+</script>
+{% endblock %}

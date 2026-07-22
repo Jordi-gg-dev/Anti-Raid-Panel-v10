@@ -164,6 +164,22 @@ _conn.executescript(
         role_id INTEGER NOT NULL,
         PRIMARY KEY (guild_id, level)
     );
+    CREATE TABLE IF NOT EXISTS command_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER,
+        guild_name TEXT,
+        user_id INTEGER NOT NULL,
+        username TEXT,
+        command_name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS staff_members (
+        user_id INTEGER PRIMARY KEY,
+        rank TEXT NOT NULL,
+        username TEXT,
+        avatar_url TEXT,
+        added_at INTEGER NOT NULL
+    );
     """
 )
 _conn.commit()
@@ -525,6 +541,52 @@ def list_premium_guilds():
         "SELECT guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at "
         "FROM premium_guilds WHERE status='active'"
     )
+
+
+# ---------------------------------------------------------------------------
+# Registro global de comandos usados (solo panel, propietario)
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Staff (equipo mostrado en el botón "Staff" del panel)
+# ---------------------------------------------------------------------------
+def add_staff_member(user_id: int, rank: str, username: str | None = None, avatar_url: str | None = None) -> None:
+    _execute(
+        "INSERT INTO staff_members (user_id, rank, username, avatar_url, added_at) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET rank=excluded.rank, "
+        "username=COALESCE(excluded.username, staff_members.username), "
+        "avatar_url=COALESCE(excluded.avatar_url, staff_members.avatar_url)",
+        (user_id, rank, username, avatar_url, int(time.time())),
+    )
+
+
+def remove_staff_member(user_id: int) -> None:
+    _execute("DELETE FROM staff_members WHERE user_id = ?", (user_id,))
+
+
+def list_staff_members():
+    return _fetchall(
+        "SELECT user_id, rank, username, avatar_url, added_at FROM staff_members ORDER BY added_at ASC"
+    )
+
+
+def list_command_log(limit: int = 200, guild_id=None, user_id=None, command_name=None):
+    query = (
+        "SELECT id, guild_id, guild_name, user_id, username, command_name, created_at "
+        "FROM command_log WHERE 1=1"
+    )
+    params: list = []
+    if guild_id:
+        query += " AND guild_id = ?"
+        params.append(int(guild_id))
+    if user_id:
+        query += " AND user_id = ?"
+        params.append(int(user_id))
+    if command_name:
+        query += " AND command_name LIKE ?"
+        params.append(f"%{command_name}%")
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(int(limit))
+    return _fetchall(query, tuple(params))
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,75 @@
   <p class="text-sm text-slate-400 mt-1">Bloqueos a nivel de todo el bot (afectan a cualquier servidor).</p>
 </div>
 
+<div class="card mb-6">
+  <div class="font-bold text-white mb-1">💎 Premium — dar o quitar acceso manualmente</div>
+  <p class="text-xs text-slate-400 mb-4">Regala Premium gratis y permanente a cualquier servidor (no requiere pago en Stripe). Se mantiene activo hasta que tú mismo lo quites.</p>
+  <form method="post" action="{{ url_for('global_premium_grant') }}" class="flex flex-col sm:flex-row gap-2 mb-4">
+    <input type="text" name="guild_id" placeholder="ID del servidor" required class="flex-1">
+    <button type="submit" class="btn-primary whitespace-nowrap">🎁 Dar Premium gratis</button>
+  </form>
+  <div class="space-y-2">
+    {% for guild_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at in premium_guilds %}
+    <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+      <div>
+        <div class="text-sm text-slate-200 font-semibold">{{ guild_names.get(guild_id|string, guild_id) }}</div>
+        <div class="text-xs text-slate-500">
+          ID: <code>{{ guild_id }}</code>
+          {% if stripe_subscription_id %}
+            <span class="ml-2 text-emerald-400">💳 Stripe</span>
+          {% else %}
+            <span class="ml-2 text-amber-400">🎁 Regalado</span>
+          {% endif %}
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('global_premium_revoke') }}">
+        <input type="hidden" name="guild_id" value="{{ guild_id }}">
+        <button type="submit" class="text-xs text-red-400 hover:text-red-300 font-semibold">Quitar Premium</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="text-xs text-slate-500">Ningún servidor con Premium activo.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-1">🧑‍💼 Staff — equipo mostrado en el botón "Staff" del panel</div>
+  <p class="text-xs text-slate-400 mb-4">Da de alta a alguien como Staff eligiendo su rango. Aparecerá con su ID, avatar y rango en el desplegable "Staff" de la barra superior.</p>
+  <form method="post" action="{{ url_for('global_staff_add') }}" class="flex flex-col sm:flex-row gap-2 mb-4">
+    <input type="text" name="user_id" placeholder="ID de usuario" required class="flex-1">
+    <select name="rank" required class="flex-1">
+      <option value="" disabled selected>Selecciona un rango</option>
+      {% for r in staff_ranks %}
+      <option value="{{ r }}">{{ r }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-primary whitespace-nowrap">➕ Añadir al Staff</button>
+  </form>
+  <div class="space-y-2">
+    {% for member in staff_list %}
+    <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <img src="{{ member.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-8 h-8 rounded-full">
+        <div class="min-w-0">
+          <div class="text-sm text-slate-200 font-semibold truncate">{{ member.username or member.user_id }}</div>
+          <div class="text-xs text-slate-500">
+            ID: <code>{{ member.user_id }}</code>
+            <span class="ml-2 text-orange-300">{{ member.rank }}</span>
+          </div>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('global_staff_remove') }}">
+        <input type="hidden" name="user_id" value="{{ member.user_id }}">
+        <button type="submit" class="text-xs text-red-400 hover:text-red-300 font-semibold shrink-0">Quitar</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="text-xs text-slate-500">Ningún miembro del Staff añadido todavía.</div>
+    {% endfor %}
+  </div>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="card">
     <div class="font-bold text-white mb-1">🚫 Servidores bloqueados</div>

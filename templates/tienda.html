@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="text-xs text-slate-500 font-semibold mb-1">Panel de AstroCube</div>
+  <h1 class="text-2xl font-extrabold text-white">🛍️ Tienda — AstroCube Premium</h1>
+  <p class="text-sm text-slate-400 mt-1">Desbloquea todas las funciones avanzadas del bot para tu servidor. Esto es exactamente lo que consigues:</p>
+</div>
+
+<div class="card mb-6">
+  <div class="font-bold text-white mb-3">💎 ¿Qué incluye Premium?</div>
+  <div class="space-y-3">
+    {% for perk in perks %}
+    <div class="bg-black/20 rounded-lg px-3 py-2.5">
+      <div class="text-sm font-semibold text-orange-300">{{ perk.name }}</div>
+      <div class="text-xs text-slate-400 mt-0.5">{{ perk.value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="font-bold text-white mb-3">Elige el servidor al que quieres activarle Premium</div>
+  {% if guilds %}
+  <div class="space-y-2">
+    {% for g in guilds %}
+    <div class="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2.5">
+      <div class="flex items-center gap-2.5 min-w-0">
+        {% if g.get('icon') %}
+          <img src="https://cdn.discordapp.com/icons/{{ g['id'] }}/{{ g['icon'] }}.png" class="w-9 h-9 rounded-lg shrink-0">
+        {% else %}
+          <div class="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">{{ g['name'][:1] }}</div>
+        {% endif %}
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-white truncate">{{ g['name'] }}</div>
+          <div class="text-[11px] text-slate-500">ID: {{ g['id'] }}</div>
+        </div>
+      </div>
+      {% if g.is_premium %}
+        <span class="pill pill-on shrink-0">💎 Premium activo</span>
+      {% else %}
+        <form method="post" action="{{ url_for('premium_checkout', guild_id=g['id']) }}" class="shrink-0">
+          <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white cursor-pointer" style="background:#2ECC71; border:none;">💎 Comprar Premium</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center text-slate-400 py-8">No gestionas ningún servidor todavía. Invita al bot a tu servidor y vuelve aquí para activar Premium.</div>
+  {% endif %}
+</div>
+{% endblock %}

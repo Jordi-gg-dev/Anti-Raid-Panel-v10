@@ -53,6 +53,10 @@ TABS = [
     ("roles-reaccion", "Roles Reacción", "users"),
 ]
 
+# Rangos disponibles para el equipo de Staff mostrado en el botón "Staff"
+# del navbar superior (equipo del propio bot/panel, no de un servidor concreto).
+STAFF_RANKS = ["Fundador", "Co-Fundador", "Administrador", "Moderador", "Soporte", "Colaborador"]
+
 
 def login_required(view):
     """Cualquier cuenta de Discord puede iniciar sesión. El acceso concreto a
@@ -131,6 +135,10 @@ def _tab_label(key: str) -> str:
 @app.context_processor
 def inject_globals():
     custom = db.get_customization()
+    staff_list = [
+        {"user_id": user_id, "rank": rank, "username": username, "avatar_url": avatar_url}
+        for user_id, rank, username, avatar_url, added_at in db.list_staff_members()
+    ]
     return {
         "bot_name": config.BOT_NAME,
         "session_user": session.get("username"),
@@ -141,6 +149,8 @@ def inject_globals():
         "custom_js": custom.get("custom_js", ""),
         "is_owner": _is_owner(session.get("user_id")) if "user_id" in session else False,
         "support_server_invite": config.SUPPORT_SERVER_INVITE,
+        "staff_list": staff_list,
+        "staff_ranks": STAFF_RANKS,
     }
 
 
@@ -255,13 +265,109 @@ def dashboard():
     )
 
 
+@app.route("/tienda")
+@login_required
+def tienda_page():
+    try:
+        all_guilds = api.get_bot_guilds(config.BOT_TOKEN)
+    except api.DiscordAPIError as exc:
+        flash(str(exc), "error")
+        all_guilds = []
+
+    guilds = _administrable_guilds_for(session.get("user_id"), all_guilds)
+    for g in guilds:
+        g["is_premium"] = db.is_premium(int(g["id"]))
+
+    _, _, perks, _, _ = _premium_welcome_message("tu servidor")
+
+    return render_template("tienda.html", guilds=guilds, perks=perks)
+
+
 @app.route("/global", methods=["GET"])
 @login_required
 @owner_required
 def global_page():
     guild_blacklist = db.list_guild_blacklist()
     user_blacklist = db.list_user_blacklist()
-    return render_template("global.html", guild_blacklist=guild_blacklist, user_blacklist=user_blacklist)
+
+    premium_guilds = db.list_premium_guilds()
+    try:
+        all_guilds = api.get_bot_guilds(config.BOT_TOKEN)
+        guild_names = {g["id"]: g["name"] for g in all_guilds}
+    except api.DiscordAPIError:
+        guild_names = {}
+
+    return render_template(
+        "global.html", guild_blacklist=guild_blacklist, user_blacklist=user_blacklist,
+        premium_guilds=premium_guilds, guild_names=guild_names,
+    )
+
+
+@app.route("/global/premium/grant", methods=["POST"])
+@login_required
+@owner_required
+def global_premium_grant():
+    guild_id = request.form.get("guild_id", "").strip()
+    if not guild_id or not guild_id.isdigit():
+        flash("Indica un ID de servidor válido.", "error")
+        return redirect(url_for("global_page"))
+    db.upsert_premium(int(guild_id), "active")
+    flash(f"Premium regalado al servidor {guild_id}. Es permanente hasta que lo quites tú mismo.", "success")
+    return redirect(url_for("global_page"))
+
+
+@app.route("/global/premium/revoke", methods=["POST"])
+@login_required
+@owner_required
+def global_premium_revoke():
+    guild_id = request.form.get("guild_id", "").strip()
+    if not guild_id:
+        flash("Falta el ID del servidor.", "error")
+        return redirect(url_for("global_page"))
+    db.upsert_premium(int(guild_id), "canceled")
+    flash(f"Premium retirado del servidor {guild_id}.", "success")
+    return redirect(url_for("global_page"))
+
+
+@app.route("/global/staff/add", methods=["POST"])
+@login_required
+@owner_required
+def global_staff_add():
+    user_id = request.form.get("user_id", "").strip()
+    rank = request.form.get("rank", "").strip()
+    if not user_id or not user_id.isdigit():
+        flash("Indica un ID de usuario válido.", "error")
+        return redirect(url_for("global_page"))
+    if rank not in STAFF_RANKS:
+        flash("Selecciona un rango válido.", "error")
+        return redirect(url_for("global_page"))
+
+    username, avatar_url = None, None
+    try:
+        user = api.get_user(config.BOT_TOKEN, int(user_id))
+        if user:
+            discriminator = user.get("discriminator", "0")
+            username = user["username"] if discriminator == "0" else f"{user['username']}#{discriminator}"
+            avatar_url = api.user_avatar_url(user)
+    except api.DiscordAPIError:
+        pass
+
+    db.add_staff_member(int(user_id), rank, username=username, avatar_url=avatar_url)
+    flash(f"{username or user_id} añadido al Staff como {rank}.", "success")
+    return redirect(url_for("global_page"))
+
+
+@app.route("/global/staff/remove", methods=["POST"])
+@login_required
+@owner_required
+def global_staff_remove():
+    user_id = request.form.get("user_id", "").strip()
+    if not user_id or not user_id.isdigit():
+        flash("Falta el ID del usuario.", "error")
+        return redirect(url_for("global_page"))
+    db.remove_staff_member(int(user_id))
+    flash("Miembro del Staff eliminado.", "success")
+    return redirect(url_for("global_page"))
 
 
 @app.route("/activity", methods=["GET"])
@@ -294,6 +400,38 @@ def activity_page():
         by_guild=by_guild,
         logins=logins,
         owner_ids_for_badge=config.OWNER_IDS,
+    )
+
+
+@app.route("/global/comandos", methods=["GET"])
+@login_required
+@owner_required
+def command_log_page():
+    filtro_guild = request.args.get("guild_id", "").strip()
+    filtro_user = request.args.get("user_id", "").strip()
+    filtro_comando = request.args.get("comando", "").strip()
+
+    rows = db.list_command_log(
+        limit=300,
+        guild_id=filtro_guild if filtro_guild.isdigit() else None,
+        user_id=filtro_user if filtro_user.isdigit() else None,
+        command_name=filtro_comando or None,
+    )
+    entries = [
+        {
+            "id": r[0], "guild_id": r[1], "guild_name": r[2],
+            "user_id": r[3], "username": r[4], "command_name": r[5],
+            "created_at": r[6],
+        }
+        for r in rows
+    ]
+
+    return render_template(
+        "command_log.html",
+        entries=entries,
+        filtro_guild=filtro_guild,
+        filtro_user=filtro_user,
+        filtro_comando=filtro_comando,
     )
 
 
@@ -483,7 +621,7 @@ def guild_detail(guild_id):
             "antiraid_enabled": db.get_bool(guild_id, "antiraid_enabled", True),
             "antiraid_action": db.get_config(guild_id, "antiraid_action", "lockdown-verification"),
             "antiraid_log_channel": db.get_config(guild_id, "antiraid_log_channel"),
-            "antiraid_min_account_age": db.get_config(guild_id, "antiraid_min_account_age", 3),
+            "antiraid_min_account_age": db.get_config(guild_id, "antiraid_min_account_age", 0),
             "autorole": db.get_config(guild_id, "autorole"),
         }
         thresholds = {

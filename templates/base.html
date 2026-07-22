@@ -19,8 +19,23 @@
       </a>
       <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-300">
         <a href="{{ url_for('dashboard') }}" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('home') }} Inicio</a>
-        <a href="#" title="Próximamente" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('shopping-bag') }} Tienda</a>
-        <a href="{{ url_for('dashboard') }}" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('users') }} Staff</a>
+        <a href="{{ url_for('tienda_page') }}" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('shopping-bag') }} Tienda</a>
+        <div class="relative">
+          <button type="button" onclick="document.getElementById('staff-dropdown').classList.toggle('hidden')" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('users') }} Staff</button>
+          <div id="staff-dropdown" class="hidden absolute left-0 mt-2 w-72 max-h-96 overflow-y-auto bg-black border border-white/10 rounded-xl shadow-xl p-2 z-50">
+            {% for member in staff_list %}
+            <div class="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/5">
+              <img src="{{ member.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-7 h-7 rounded-full shrink-0">
+              <div class="min-w-0">
+                <div class="text-xs font-semibold text-slate-200 truncate">{{ member.username or member.user_id }}</div>
+                <div class="text-[11px] text-slate-500">ID: {{ member.user_id }} · <span class="text-orange-300">{{ member.rank }}</span></div>
+              </div>
+            </div>
+            {% else %}
+            <div class="text-xs text-slate-500 px-2 py-3 text-center">Todavía no hay Staff registrado.</div>
+            {% endfor %}
+          </div>
+        </div>
         <a href="#" title="Próximamente" class="flex items-center gap-1.5 hover:text-white transition">{{ icons.icon('file-text') }} Normas</a>
       </nav>
       <div class="flex items-center gap-3 shrink-0">
@@ -75,6 +90,7 @@
           {% if is_owner %}
           <a href="{{ url_for('activity_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'activity_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('activity') }} Actividad</a>
           <a href="{{ url_for('global_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'global_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('globe') }} Global</a>
+          <a href="{{ url_for('command_log_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold mb-0.5 {% if request.endpoint == 'command_log_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('clipboard-check') }} Comandos</a>
           <a href="{{ url_for('code_page') }}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold {% if request.endpoint == 'code_page' %}bg-gradient-to-r from-orange-600 to-amber-500 text-black{% else %}text-slate-300 hover:bg-white/5{% endif %}">{{ icons.icon('code') }} Código</a>
           {% endif %}
         {% endif %}
@@ -96,6 +112,15 @@
     </main>
   </div>
 
+<script>
+  document.addEventListener("click", function(e) {
+    const dd = document.getElementById("staff-dropdown");
+    if (!dd || dd.classList.contains("hidden")) return;
+    if (!dd.contains(e.target) && !e.target.closest("button[onclick*='staff-dropdown']")) {
+      dd.classList.add("hidden");
+    }
+  });
+</script>
 {% if custom_js %}<script>{{ custom_js|safe }}</script>{% endif %}
 </body>
 </html>

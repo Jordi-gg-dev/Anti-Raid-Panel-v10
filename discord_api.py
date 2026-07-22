@@ -44,6 +44,27 @@ def get_bot_user(token: str) -> dict:
     return resp.json()
 
 
+def get_user(token: str, user_id: int) -> dict | None:
+    """Info publica de cualquier usuario de Discord (avatar, username) usando
+    el token del bot. No requiere que comparta servidor con el bot."""
+    resp = _request("GET", f"{API_BASE}/users/{user_id}", headers=_headers(token))
+    if resp.status_code != 200:
+        return None
+    return resp.json()
+
+
+def user_avatar_url(user: dict, size: int = 64) -> str:
+    """Construye la URL del avatar de un usuario (o el avatar por defecto si no tiene)."""
+    user_id = user.get("id")
+    avatar = user.get("avatar")
+    if avatar:
+        ext = "gif" if avatar.startswith("a_") else "png"
+        return f"https://cdn.discordapp.com/avatars/{user_id}/{avatar}.{ext}?size={size}"
+    # Avatar por defecto de Discord (basado en discriminator o id, aproximado).
+    index = (int(user_id) >> 22) % 6 if user_id else 0
+    return f"https://cdn.discordapp.com/embed/avatars/{index}.png"
+
+
 def get_guild(token: str, guild_id: int, with_counts: bool = False) -> dict:
     url = f"{API_BASE}/guilds/{guild_id}"
     if with_counts:
